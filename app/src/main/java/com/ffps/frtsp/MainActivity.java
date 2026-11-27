@@ -215,8 +215,8 @@ public class MainActivity extends Activity {
         cameraCount.setText(String.valueOf(cameras));
         serviceButton.setEnabled(running || cameras > 0);
         serviceButton.setAlpha(running || cameras > 0 ? 1.0f : 0.45f);
-        editCamerasButton.setEnabled(!running);
-        editCamerasButton.setAlpha(running ? 0.45f : 1.0f);
+        editCamerasButton.setEnabled(true);
+        editCamerasButton.setAlpha(1.0f);
         if (running) {
             status.setText("Running: http://" + getDeviceIp() + ":" + currentPort);
             serviceButton.setText("STOP SERVICE");
