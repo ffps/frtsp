@@ -32,12 +32,12 @@ public class MjpegHttpServer {
             .getInt("http_port", 8554);
     }
 
-    public synchronized void start() {
+    public synchronized void start() throws Exception {
         if (running) return;
+        socket = new ServerSocket(port, 32, InetAddress.getByName("0.0.0.0"));
         running = true;
         acceptThread = new Thread(() -> {
             try {
-                socket = new ServerSocket(port, 32, InetAddress.getByName("0.0.0.0"));
                 while (running) {
                     final Socket client = socket.accept();
                     clients.execute(() -> handle(client));

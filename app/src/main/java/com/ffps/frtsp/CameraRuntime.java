@@ -7,6 +7,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -311,7 +312,7 @@ public class CameraRuntime {
                     }, "fRTSP-watch-" + name);
                     watchdog.setDaemon(true); watchdog.start();
                     state="connecting";
-                    readJpegs(current.getInputStream());
+                    readJpegs(new BufferedInputStream(current.getInputStream(), 65536));
                     if (!wanted || !running) break;
                     int exit=current.waitFor();
                     if (restartRequested) { restartRequested=false; continue; }
