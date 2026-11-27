@@ -38,6 +38,11 @@ public class CameraRuntime {
     private volatile boolean running;
     private long cpuTotalPrevious = -1;
     private long cpuIdlePrevious = -1;
+    private volatile double latestCpuUsage = -1;
+    private volatile long latestCpuSampleAt;
+    private long cpuUsageSamples;
+    private double cpuUsageSum;
+    private volatile Thread cpuSamplerThread;
 
     public CameraRuntime(Context context, File ffmpeg) {
         this.context = context.getApplicationContext();
@@ -47,6 +52,7 @@ public class CameraRuntime {
     public synchronized void start() throws Exception {
         if (running) return;
         running = true;
+        startCpuSampler();
         JSONArray cameras = readConfig();
         for (int i = 0; i < cameras.length(); i++) {
             JSONObject item = cameras.optJSONObject(i);
@@ -62,6 +68,7 @@ public class CameraRuntime {
 
     public synchronized void stop() {
         running = false;
+        stopCpuSampler();
         for (CameraWorker worker : workers.values()) worker.stop();
         workers.clear();
         addLog("INFO", "Camera runtime stopped");
@@ -150,10 +157,12 @@ public class CameraRuntime {
                 .put("system_low_memory", systemMemory.lowMemory);
             JSONObject cpu = new JSONObject().put("process_id", android.os.Process.myPid())
                 .put("available_processors", rt.availableProcessors())
-                .put("system_usage_percent", Math.round(readSystemCpuPercent() * 10.0) / 10.0);
+                .put("system_usage_percent", latestCpuUsage < 0 ? JSONObject.NULL : Math.round(latestCpuUsage * 10.0) / 10.0)
+                .put("sample_age_ms", latestCpuSampleAt > 0 ? System.currentTimeMillis()-latestCpuSampleAt : JSONObject.NULL);
             return new JSONObject().put("running", running).put("port", port)
                 .put("uptime_seconds", (System.currentTimeMillis()-startedAt)/1000)
-                .put("memory", memory).put("cpu", cpu).put("cameras", cameras);
+                .put("memory", memory).put("cpu", cpu)
+                .put("ffmpeg_processes", activeProcesses()).put("cameras", cameras);
         } catch (Exception e) { return new JSONObject(); }
     }
 
@@ -179,20 +188,64 @@ public class CameraRuntime {
         } catch (Exception e) { return -1; }
     }
 
+    private void startCpuSampler() {
+        Thread thread = new Thread(() -> {
+            while (running && !Thread.currentThread().isInterrupted()) {
+                double value = readSystemCpuPercent();
+                if (value >= 0) {
+                    latestCpuUsage = value;
+                    latestCpuSampleAt = System.currentTimeMillis();
+                    synchronized (this) {
+                        cpuUsageSum += value;
+                        cpuUsageSamples++;
+                    }
+                }
+                try { Thread.sleep(1000L); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            }
+        }, "fRTSP-cpu");
+        thread.setDaemon(true);
+        cpuSamplerThread = thread;
+        thread.start();
+    }
+
+    private void stopCpuSampler() {
+        Thread thread = cpuSamplerThread;
+        cpuSamplerThread = null;
+        if (thread != null) thread.interrupt();
+    }
+
     public JSONObject statsJson() {
         try {
             JSONArray cameras = new JSONArray();
             for (CameraWorker worker : workers.values()) {
-                cameras.put(new JSONObject().put("name", worker.name).put("frames", worker.counters.frames.get())
-                    .put("restarts", worker.restartCount).put("errors", worker.counters.errors.get())
-                    .put("state", worker.state));
+                CameraCounters c = worker.counters;
+                long intervals = c.intervalCount.get();
+                long minInterval = c.minIntervalMs.get();
+                long maxInterval = c.maxIntervalMs.get();
+                JSONObject item = new JSONObject().put("name", worker.name)
+                    .put("frames", c.frames.get()).put("restarts", c.restarts.get())
+                    .put("errors", c.errors.get())
+                    .put("average_output_fps", intervals > 0 ? round2(1000.0 * intervals / c.intervalSumMs.get()) : JSONObject.NULL)
+                    .put("min_output_fps", maxInterval > 0 ? round2(1000.0 / maxInterval) : JSONObject.NULL)
+                    .put("max_output_fps", minInterval > 0 && minInterval != Long.MAX_VALUE ? round2(1000.0 / minInterval) : JSONObject.NULL)
+                    .put("average_frame_interval_ms", intervals > 0 ? c.intervalSumMs.get() / intervals : JSONObject.NULL)
+                    .put("max_frame_interval_ms", maxInterval > 0 ? maxInterval : JSONObject.NULL);
+                cameras.put(item);
             }
+            double averageCpu;
+            long cpuSamples;
+            synchronized (this) { cpuSamples = cpuUsageSamples; averageCpu = cpuSamples > 0 ? cpuUsageSum / cpuSamples : -1; }
+            JSONObject cpu = new JSONObject().put("average_usage_percent", averageCpu >= 0 ? Math.round(averageCpu * 10.0) / 10.0 : JSONObject.NULL)
+                .put("samples", cpuSamples);
+            JSONObject totals = new JSONObject().put("jpeg_frames", totalFrames.get())
+                .put("ffmpeg_restarts", totalRestarts.get()).put("camera_errors", totalErrors.get());
             return new JSONObject().put("uptime_seconds", (System.currentTimeMillis()-startedAt)/1000)
-                .put("ffmpeg_processes", activeProcesses()).put("jpeg_frames_total", totalFrames.get())
-                .put("ffmpeg_restarts_total", totalRestarts.get()).put("camera_errors_total", totalErrors.get())
-                .put("cameras", cameras);
+                .put("cpu", cpu).put("totals", totals).put("cameras", cameras);
         } catch (Exception e) { return new JSONObject(); }
     }
+
+    private static double round2(double value) { return Math.round(value * 100.0) / 100.0; }
 
     public JSONObject configJson() {
         try {
@@ -259,9 +312,26 @@ public class CameraRuntime {
         return value.replaceAll("(?i)(rtsp://[^:/@]+):[^@/]*@", "$1:***@");
     }
 
+    private static void updateMin(AtomicLong target, long value) {
+        long current;
+        do { current = target.get(); if (value >= current) return; }
+        while (!target.compareAndSet(current, value));
+    }
+
+    private static void updateMax(AtomicLong target, long value) {
+        long current;
+        do { current = target.get(); if (value <= current) return; }
+        while (!target.compareAndSet(current, value));
+    }
+
     private static class CameraCounters {
         final AtomicLong frames = new AtomicLong();
         final AtomicLong errors = new AtomicLong();
+        final AtomicLong restarts = new AtomicLong();
+        final AtomicLong intervalSumMs = new AtomicLong();
+        final AtomicLong intervalCount = new AtomicLong();
+        final AtomicLong minIntervalMs = new AtomicLong(Long.MAX_VALUE);
+        final AtomicLong maxIntervalMs = new AtomicLong();
     }
 
     private synchronized CameraCounters countersFor(String name) {
@@ -387,7 +457,7 @@ public class CameraRuntime {
                 }
                 if(wanted && running) {
                     if (System.currentTimeMillis()-lastFrameAt < 10000) delay=2;
-                    state="reconnecting"; restartCount++; totalRestarts.incrementAndGet();
+                    state="reconnecting"; restartCount++; counters.restarts.incrementAndGet(); totalRestarts.incrementAndGet();
                     try { Thread.sleep(delay*1000L); } catch(InterruptedException ignored) { }
                     delay=Math.min(30,delay*2);
                 }
@@ -427,7 +497,13 @@ public class CameraRuntime {
                     else if(previous==0xff && value==0xd9) {
                         latestFrame=frame.toByteArray();
                         long now=System.currentTimeMillis();
-                        if(lastFrameAt>0) lastFrameIntervalMs=now-lastFrameAt;
+                        if(lastFrameAt>0) {
+                            lastFrameIntervalMs=now-lastFrameAt;
+                            counters.intervalSumMs.addAndGet(lastFrameIntervalMs);
+                            counters.intervalCount.incrementAndGet();
+                            updateMin(counters.minIntervalMs, lastFrameIntervalMs);
+                            updateMax(counters.maxIntervalMs, lastFrameIntervalMs);
+                        }
                         lastFrameAt=now;
                         frameSequence++; counters.frames.incrementAndGet(); totalFrames.incrementAndGet();
                         state="streaming";
@@ -444,8 +520,7 @@ public class CameraRuntime {
             return new JSONObject().put("name",name).put("state",state).put("fps",fps)
                 .put("jpeg_quality",quality).put("source_width",sourceWidth).put("source_height",sourceHeight)
                 .put("output_fps",lastFrameIntervalMs>0?Math.round(1000.0/lastFrameIntervalMs*100.0)/100.0:0)
-                .put("frames_total",counters.frames.get()).put("frame_age_ms",age).put("restarts",restartCount)
-                .put("errors",counters.errors.get()).put("last_error",lastError)
+                .put("frame_age_ms",age).put("last_error",lastError)
                 .put("last_frame_at",lastFrameAt>0?iso8601Utc(lastFrameAt):JSONObject.NULL)
                 .put("last_error_at",lastErrorAt>0?iso8601Utc(lastErrorAt):JSONObject.NULL);
         }
