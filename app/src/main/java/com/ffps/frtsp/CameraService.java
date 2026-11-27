@@ -5,6 +5,12 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.net.wifi.WifiManager;
+import android.text.format.Formatter;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -23,9 +29,11 @@ public class CameraService extends Service {
             installFfmpeg();
             Intent launch = new Intent(this, MainActivity.class);
             PendingIntent pending = PendingIntent.getActivity(this, 0, launch, 0);
+            int port = getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554);
+            String serverUrl = "http://" + getDeviceIp() + ":" + port + "/";
             Notification notification = new Notification.Builder(this)
-                .setContentTitle("fRTSP")
-                .setContentText("HTTP server :" + getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554))
+                .setContentTitle("fRTSP server is running")
+                .setContentText(serverUrl)
                 .setSmallIcon(android.R.drawable.presence_video_online)
                 .setContentIntent(pending)
                 .getNotification();
@@ -39,6 +47,30 @@ public class CameraService extends Service {
             lastError = e.getMessage() == null ? e.toString() : e.getMessage();
             stopSelf();
         }
+    }
+
+
+    private String getDeviceIp() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                NetworkInterface network = interfaces.nextElement();
+                Enumeration<InetAddress> addresses = network.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress address = addresses.nextElement();
+                    if (!address.isLoopbackAddress() && !address.isLinkLocalAddress() &&
+                        address instanceof Inet4Address && address.getHostAddress() != null) {
+                        return address.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) { }
+        try {
+            WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+            int ip = wifi.getConnectionInfo().getIpAddress();
+            if (ip != 0) return Formatter.formatIpAddress(ip);
+        } catch (Exception ignored) { }
+        return "DEVICE_IP";
     }
 
     private void installFfmpeg() throws Exception {

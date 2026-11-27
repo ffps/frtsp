@@ -58,6 +58,21 @@ public class MainActivity extends Activity {
         status.setPadding(dp(8), 0, dp(8), 0);
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(44)));
 
+        TextView portLabel = new TextView(this);
+        portLabel.setText("Port");
+        portLabel.setTextSize(14);
+        portLabel.setTextColor(Color.DKGRAY);
+        portLabel.setPadding(0, dp(10), 0, dp(4));
+        root.addView(portLabel);
+
+        port = new EditText(this);
+        port.setSingleLine(true);
+        port.setTextSize(15);
+        port.setHint("8554");
+        port.setInputType(InputType.TYPE_CLASS_NUMBER);
+        port.setText(String.valueOf(getSavedPort()));
+        root.addView(port, new LinearLayout.LayoutParams(-1, dp(48)));
+
         TextView passwordLabel = new TextView(this);
         passwordLabel.setText("API password");
         passwordLabel.setTextSize(14);
@@ -73,13 +88,6 @@ public class MainActivity extends Activity {
         password.setText(getSharedPreferences("settings", MODE_PRIVATE).getString("api_password", ""));
         root.addView(password, new LinearLayout.LayoutParams(-1, dp(48)));
 
-        saveButton = makeButton("Save", Color.rgb(55, 115, 190));
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
-        saveParams.topMargin = dp(10);
-        saveParams.gravity = Gravity.LEFT;
-        root.addView(saveButton, saveParams);
-        saveButton.setOnClickListener(v -> saveSettings());
-
         showPassword = new CheckBox(this);
         showPassword.setText("Show password");
         showPassword.setTextColor(Color.DKGRAY);
@@ -92,20 +100,12 @@ public class MainActivity extends Activity {
         });
         root.addView(showPassword);
 
-        TextView portLabel = new TextView(this);
-        portLabel.setText("Port");
-        portLabel.setTextSize(14);
-        portLabel.setTextColor(Color.DKGRAY);
-        portLabel.setPadding(0, dp(10), 0, dp(4));
-        root.addView(portLabel);
-
-        port = new EditText(this);
-        port.setSingleLine(true);
-        port.setTextSize(15);
-        port.setHint("8554");
-        port.setInputType(InputType.TYPE_CLASS_NUMBER);
-        port.setText(String.valueOf(getSavedPort()));
-        root.addView(port, new LinearLayout.LayoutParams(-1, dp(48)));
+        saveButton = makeButton("Save", Color.rgb(55, 115, 190));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
+        saveParams.topMargin = dp(10);
+        saveParams.gravity = Gravity.LEFT;
+        root.addView(saveButton, saveParams);
+        saveButton.setOnClickListener(v -> saveSettings());
 
         hint = new TextView(this);
         hint.setTextSize(13);
@@ -136,7 +136,9 @@ public class MainActivity extends Activity {
         version.setGravity(Gravity.CENTER);
         root.addView(version, new LinearLayout.LayoutParams(-1, dp(28)));
 
+        root.setFocusableInTouchMode(true);
         setContentView(root);
+        root.requestFocus();
         updateHint();
         updateStatus();
     }
@@ -193,7 +195,7 @@ public class MainActivity extends Activity {
 
     private void updateHint() {
         int p = getSavedPort();
-        String base = "http://DEVICE_IP:" + p;
+        String base = "http://" + getDeviceIp() + ":" + p;
         hint.setText("MJPEG: " + base + "/camera/1\n" +
             "Snapshot: " + base + "/camera/1.jpg\n" +
             "API: " + base + "/api/v1/status\n" +
