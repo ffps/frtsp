@@ -123,7 +123,7 @@ public class CameraRuntime {
                 .put("system_low_memory", systemMemory.lowMemory);
             JSONObject cpu = new JSONObject().put("process_id", android.os.Process.myPid())
                 .put("available_processors", rt.availableProcessors())
-                .put("system_usage_percent", readSystemCpuPercent());
+                .put("system_usage_percent", Math.round(readSystemCpuPercent() * 10.0) / 10.0);
             return new JSONObject().put("running", running).put("port", port)
                 .put("uptime_seconds", (System.currentTimeMillis()-startedAt)/1000)
                 .put("memory", memory).put("cpu", cpu).put("cameras", cameras);
