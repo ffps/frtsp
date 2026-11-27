@@ -20,31 +20,55 @@ body{
   font:15px Arial}
 header{
   height:58px;
-  background:white;
-  box-shadow:0 2px 9px #172b4d18;
+  background:var(--a);
+  color:#fff;
+  box-shadow:0 2px 9px #172b4d38;
   display:flex;
   align-items:center;
-  padding:0 16px;
-  gap:8px;
+  padding:0 12px;
+  gap:4px;
   position:sticky;
-  top:0}
+  top:0;
+  z-index:10}
 .brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
   font-size:20px;
   font-weight:bold;
-  color:var(--a);
+  color:#fff;
   margin-right:auto}
+.brand-logo{
+  width:32px;
+  height:32px;
+  flex:none;
+  display:block}
 .icon{
   border:0;
   background:none;
-  color:#4c5668;
+  color:#fff;
   font-size:22px;
   width:40px;
   height:40px;
+  flex:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   border-radius:50%;
   cursor:pointer}
+.icon svg{
+  width:24px;
+  height:24px;
+  fill:currentColor}
+.icon svg.line{
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round}
 .icon:hover{
-  background:#edf1f8;
-  color:var(--a)}
+  background:rgba(255,255,255,.18)}
 main{
   max-width:1180px;
   margin:22px auto;
@@ -130,6 +154,70 @@ dialog{
   box-shadow:0 15px 50px #0004}
 dialog::backdrop{
   background:#10182777}
+#login.login-dialog{
+  position:fixed;
+  top:72px;
+  left:0;
+  right:0;
+  margin:0 auto;
+  width:100%;
+  max-width:none;
+  max-height:none;
+  overflow:visible;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none}
+#login.login-dialog::backdrop{
+  background:transparent}
+.login-card{
+  width:calc(100% - 32px);
+  max-width:320px;
+  margin:40px auto 0;
+  padding:16px;
+  background:#fff;
+  border-radius:4px;
+  box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.login-card h2{
+  margin:0 0 16px;
+  font-size:20px;
+  font-weight:500}
+.login-card .field{
+  width:100%;
+  font:inherit;
+  font-size:16px;
+  padding:8px 0;
+  border:0;
+  border-bottom:2px solid var(--a);
+  border-radius:0;
+  background:none;
+  outline:none;
+  color:var(--text)}
+.login-card .field:focus{
+  border-bottom-color:var(--a)}
+.login-error{
+  color:#b3261e;
+  min-height:20px;
+  margin-top:8px;
+  font-size:13px}
+.login-submit{
+  margin-top:8px;
+  min-width:88px;
+  background:var(--a);
+  color:#fff;
+  border:0;
+  border-radius:4px;
+  padding:0 20px;
+  height:36px;
+  box-shadow:0 2px 3px rgba(0,0,0,.3);
+  font-size:14px;
+  font-weight:500;
+  text-transform:uppercase;
+  letter-spacing:.5px;
+  cursor:pointer}
+.login-submit:hover{
+  filter:brightness(.92)}
 .dh{
   padding:17px 20px;
   border-bottom:1px solid var(--line);
@@ -207,6 +295,12 @@ header{
   padding:0 7px}
 .brand{
   font-size:18px}
+.brand-logo{
+  width:29px;
+  height:29px}
+.icon{
+  width:38px;
+  height:38px}
 .grid{
   grid-template-columns:1fr}
 .kv{
@@ -216,12 +310,30 @@ header{
 </head>
 <body>
 <header>
-<div class="brand">fRTSP</div>
-<button class="icon" id="settings" title="Настройки">⚙</button>
-<button class="icon" id="refresh" title="Обновить">↻</button>
-<button class="icon" id="info" title="Информация">ⓘ</button>
-<button class="icon" id="add" title="Добавить камеру">＋</button>
-<button class="icon" id="logout" title="Выход">⇥</button>
+<div class="brand">
+<svg class="brand-logo" viewBox="0 0 120 120" role="img" aria-label="fRTSP">
+  <path d="M60 32 L30 51 L60 70" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M60 50 L90 69 L60 88" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+<span>fRTSP</span>
+</div>
+<span id="tools" style="display:none;align-items:center;gap:4px">
+<button class="icon" id="add" title="Добавить камеру" aria-label="Добавить камеру">
+  <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+</button>
+<button class="icon" id="settings" title="Настройки" aria-label="Настройки">
+  <svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M19.39 10.23 22.15 11.04v1.92l-2.76.81-.91 2.2 1.38 2.53-1.36 1.36-2.53-1.38-2.2.91-.81 2.76h-1.92l-.81-2.76-2.2-.91-2.53 1.38-1.36-1.36 1.38-2.53-.91-2.2-2.76-.81v-1.92l2.76-.81.91-2.2L4.14 5.5 5.5 4.14l2.53 1.38 2.2-.91.81-2.76h1.92l.81 2.76 2.2.91 2.53-1.38 1.36 1.36-1.38 2.53zM15.4 12a3.4 3.4 0 1 0-6.8 0 3.4 3.4 0 0 0 6.8 0z"/></svg>
+</button>
+<button class="icon" id="refresh" title="Обновить" aria-label="Обновить">
+  <svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5.5 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.5-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
+<button class="icon" id="info" title="Информация" aria-label="Информация">
+  <svg class="line" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.6h.01"/></svg>
+</button>
+<button class="icon" id="logout" title="Выход" aria-label="Выход">
+  <svg class="line" viewBox="0 0 24 24"><path d="M10 4H5v16h5"/><path d="m16 8 4 4-4 4M9 12h11"/></svg>
+</button>
+</span>
 </header>
 <main>
 <div class="heading">
@@ -235,22 +347,12 @@ header{
 </main>
 <div id="toast">
 </div>
-<dialog id="login">
-<div class="dh">
-<h2>Авторизация</h2>
-</div>
-<form id="loginForm">
-<div class="db">
-<p class="note">Basic Auth · пользователь api. Пароль хранится только в текущей вкладке.</p>
-<label class="field">
-<span>Пароль API</span>
-<input id="password" type="password" required autocomplete="current-password">
-</label>
-<div id="loginError" class="pill bad" hidden>Неверный пароль или API недоступно</div>
-</div>
-<div class="df">
-<button class="primary">Войти</button>
-</div>
+<dialog id="login" class="login-dialog">
+<form id="loginForm" class="login-card">
+<h2>Вход</h2>
+<input class="field" id="password" type="password" placeholder="Пароль" required autocomplete="current-password">
+<div id="loginError" class="login-error" hidden>Неверный пароль или API недоступно</div>
+<button class="login-submit" type="submit">Войти</button>
 </form>
 </dialog>
 <dialog id="cameraDlg">
@@ -349,6 +451,7 @@ header{
     }
     function login() {
         $('loginError').hidden=true;
+        $('tools').style.display='none';
         if(!$('login').open)$('login').showModal()
     }
     function api(path, method, data) {
@@ -405,6 +508,7 @@ header{
         Promise.all([api('/api/v1/config'), api('/api/v1/status')]).then(function(v) {
             cfg=v[0];
             st=v[1];
+            $('tools').style.display='flex';
             render();
             $('updated').textContent=new Date().toLocaleTimeString()
         }).catch(function(e) {
