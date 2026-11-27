@@ -13,6 +13,10 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.File;
 import java.io.FileReader;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -207,6 +211,13 @@ public class CameraRuntime {
         } catch (Exception e) { return new JSONObject(); }
     }
 
+    private static String iso8601Utc(long timestamp) {
+        if (timestamp <= 0) return null;
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+        format.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return format.format(new Date(timestamp));
+    }
+
     private int activeProcesses() {
         int count=0;
         for (CameraWorker worker : workers.values()) if (worker.process != null) count++;
@@ -242,6 +253,7 @@ public class CameraRuntime {
         private volatile long lastFrameIntervalMs;
         private volatile int restartCount;
         private volatile int errorCount;
+        private volatile long lastErrorAt;
         private volatile int sourceWidth;
         private volatile int sourceHeight;
         private volatile long frameSequence;
@@ -323,11 +335,13 @@ public class CameraRuntime {
                     int exit=current.waitFor();
                     if (restartRequested) { restartRequested=false; continue; }
                     errorCount++;
+                    lastErrorAt=System.currentTimeMillis();
                     if (lastError.length() == 0) lastError="FFmpeg exited with code "+exit;
                     addLog("WARN",name+": "+lastError+" (exit "+exit+")");
                 } catch(Exception e) {
                     if (!wanted || !running) break;
                     errorCount++;
+                    lastErrorAt=System.currentTimeMillis();
                     lastError=redact(e.getMessage()==null?e.toString():e.getMessage());
                     addLog("ERROR",name+": "+lastError);
                 } finally {
@@ -394,7 +408,9 @@ public class CameraRuntime {
                 .put("jpeg_quality",quality).put("source_width",sourceWidth).put("source_height",sourceHeight)
                 .put("output_fps",lastFrameIntervalMs>0?Math.round(1000.0/lastFrameIntervalMs*100.0)/100.0:0)
                 .put("frames_total",frames.get()).put("frame_age_ms",age).put("restarts",restartCount)
-                .put("errors",errorCount).put("last_error",lastError);
+                .put("errors",errorCount).put("last_error",lastError)
+                .put("last_frame_at",lastFrameAt>0?iso8601Utc(lastFrameAt):JSONObject.NULL)
+                .put("last_error_at",lastErrorAt>0?iso8601Utc(lastErrorAt):JSONObject.NULL);
         }
     }
 }
