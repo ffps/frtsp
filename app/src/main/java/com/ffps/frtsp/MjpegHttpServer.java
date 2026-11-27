@@ -70,6 +70,8 @@ public class MjpegHttpServer {
             if (request.length < 2) { respond(out, 400, "Bad Request", jsonError("bad_request")); return; }
             String method = request[0];
             String path = request[1];
+            int queryIndex = path.indexOf('?');
+            if (queryIndex >= 0) path = path.substring(0, queryIndex);
             String auth = null;
             int contentLength = 0;
             String line;
