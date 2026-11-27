@@ -253,6 +253,15 @@ public class MainActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    private Button makeButton(String text, int color) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setTextColor(Color.WHITE);
+        button.setAllCaps(false);
+        button.setBackgroundDrawable(buttonBackground(color));
+        return button;
+    }
+
     private GradientDrawable buttonBackground(int color) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(color);
