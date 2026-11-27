@@ -177,11 +177,14 @@ public class MjpegHttpServer {
             int result = runtime.updateGlobalConfig(supplied);
             if (result != 1) { respond(out, 400, "Bad Request", jsonError("invalid_config")); return; }
             int newPort = context.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("http_port", 8554);
-            respond(out, 200, "OK", new JSONObject().put("ok", true).put("port", newPort)
-                .put("port_changed", newPort != oldPort));
-            if (newPort != oldPort) {
-                new Thread(() -> CameraService.rebindHttpServer(oldPort), "fRTSP-http-rebind").start();
+            boolean portChanged = newPort != oldPort;
+            if (portChanged && !CameraService.prepareHttpServerSwitch(oldPort)) {
+                respond(out, 400, "Bad Request", jsonError("port_unavailable"));
+                return;
             }
+            respond(out, 200, "OK", new JSONObject().put("ok", true).put("port", newPort)
+                .put("port_changed", portChanged));
+            if (portChanged) CameraService.finishHttpServerSwitch();
             return;
         }
         if ("/api/v1/cameras/restart".equals(path)) {
