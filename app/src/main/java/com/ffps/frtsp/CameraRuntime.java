@@ -294,7 +294,7 @@ public class CameraRuntime {
                     ArrayList<String> command=new ArrayList<String>();
                     command.add(ffmpeg.getAbsolutePath());
                     Collections.addAll(command,"-hide_banner","-loglevel","info","-nostats",
-                        "-rtsp_transport","tcp","-timeout","5000000","-i",url,
+                        "-rtsp_transport","tcp","-stimeout","5000000","-i",url,
                         "-an","-vf","fps="+fps,"-q:v",String.valueOf(31-Math.round(quality*0.29f)),
                         "-f","image2pipe","-vcodec","mjpeg","pipe:1");
                     java.lang.ProcessBuilder builder=new java.lang.ProcessBuilder(command);
