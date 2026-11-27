@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.os.IBinder;
 import android.net.wifi.WifiManager;
 import android.text.format.Formatter;
+
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -18,15 +19,17 @@ import java.io.InputStream;
 public class CameraService extends Service {
     private static volatile boolean running;
     private static volatile String lastError;
+    private static volatile CameraRuntime runtime;
     private MjpegHttpServer server;
 
     public static boolean isRunning() { return running; }
     public static String getLastError() { return lastError; }
+    public static CameraRuntime getRuntime() { return runtime; }
 
     @Override public void onCreate() {
         super.onCreate();
         try {
-            installFfmpeg();
+            File ffmpeg = installFfmpeg();
             Intent launch = new Intent(this, MainActivity.class);
             PendingIntent pending = PendingIntent.getActivity(this, 0, launch, 0);
             int port = getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554);
@@ -38,6 +41,9 @@ public class CameraService extends Service {
                 .setContentIntent(pending)
                 .getNotification();
             startForeground(1, notification);
+
+            runtime = new CameraRuntime(this, ffmpeg);
+            runtime.start();
             server = new MjpegHttpServer(this);
             server.start();
             running = true;
@@ -45,10 +51,11 @@ public class CameraService extends Service {
         } catch (Exception e) {
             running = false;
             lastError = e.getMessage() == null ? e.toString() : e.getMessage();
+            if (runtime != null) runtime.stop();
+            runtime = null;
             stopSelf();
         }
     }
-
 
     private String getDeviceIp() {
         try {
@@ -73,9 +80,9 @@ public class CameraService extends Service {
         return "DEVICE_IP";
     }
 
-    private void installFfmpeg() throws Exception {
+    private File installFfmpeg() throws Exception {
         File target = new File(getFilesDir(), "ffmpeg");
-        if (target.exists() && target.length() > 0 && target.canExecute()) return;
+        if (target.exists() && target.length() > 0 && target.canExecute()) return target;
         InputStream input = null;
         FileOutputStream output = null;
         try {
@@ -89,12 +96,11 @@ public class CameraService extends Service {
             if (input != null) try { input.close(); } catch (Exception ignored) { }
             if (output != null) try { output.close(); } catch (Exception ignored) { }
         }
-        if (!target.setReadable(true, true) || !target.setExecutable(true, true)) {
+        if (!target.setReadable(true, true) || !target.setExecutable(true, true))
             throw new Exception("Cannot set FFmpeg permissions");
-        }
-        if (!target.exists() || target.length() == 0 || !target.canExecute()) {
+        if (!target.exists() || target.length() == 0 || !target.canExecute())
             throw new Exception("FFmpeg installation failed");
-        }
+        return target;
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -103,6 +109,8 @@ public class CameraService extends Service {
 
     @Override public void onDestroy() {
         running = false;
+        if (runtime != null) runtime.stop();
+        runtime = null;
         if (server != null) server.stop();
         stopForeground(true);
         super.onDestroy();
