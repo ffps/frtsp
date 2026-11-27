@@ -140,6 +140,126 @@ public class CameraRuntime {
         return null;
     }
 
+    public JSONObject cameraConfigJson(String name) {
+        try {
+            JSONObject item = findConfig(name);
+            if (item == null) return null;
+            return new JSONObject().put("name", item.optString("name"))
+                .put("url", redact(item.optString("url", "")))
+                .put("enabled", item.optBoolean("enabled", true))
+                .put("fps", item.optInt("fps", 1))
+                .put("quality", item.optInt("quality", 75));
+        } catch (Exception e) { return null; }
+    }
+
+    // 1=success, 0=not found, -1=already exists, -2=invalid configuration.
+    public synchronized int saveCameraConfig(String name, JSONObject supplied, boolean createOnly) {
+        if (!running || name == null || !name.matches("[a-z][a-z0-9_]{0,31}") || supplied == null)
+            return -2;
+        String suppliedName = supplied.optString("name", name);
+        if (!name.equals(suppliedName)) return -2;
+        JSONArray source = readConfig();
+        int index = -1;
+        JSONObject previous = null;
+        for (int i=0; i<source.length(); i++) {
+            JSONObject item = source.optJSONObject(i);
+            if (item != null && name.equals(item.optString("name"))) {
+                index = i; previous = item; break;
+            }
+        }
+        if (createOnly && previous != null) return -1;
+        if (!createOnly && previous == null) return 0;
+
+        try {
+            JSONObject merged = previous == null
+                ? new JSONObject().put("name", name).put("url", "").put("enabled", true).put("fps", 1).put("quality", 75)
+                : new JSONObject(previous.toString());
+            if (supplied.has("url")) {
+                String url = supplied.optString("url", "").trim();
+                if (url.length() > 0 && !url.matches("(?i)^rtsp://.*")) url = "rtsp://" + url;
+                if (previous != null && url.contains(":***@")) {
+                    String oldUrl = previous.optString("url", "");
+                    int oldAt = oldUrl.indexOf('@');
+                    int newAt = url.indexOf('@');
+                    if (oldAt > 0 && newAt > 0) url = oldUrl.substring(0, oldAt) + url.substring(newAt);
+                }
+                merged.put("url", url);
+            }
+            if (supplied.has("enabled")) {
+                if (!(supplied.opt("enabled") instanceof Boolean)) return -2;
+                merged.put("enabled", supplied.getBoolean("enabled"));
+            }
+            if (supplied.has("fps")) {
+                int fps = supplied.getInt("fps");
+                if (fps < 1 || fps > 60) return -2;
+                merged.put("fps", fps);
+            }
+            if (supplied.has("quality")) {
+                int quality = supplied.getInt("quality");
+                if (quality < 1 || quality > 100) return -2;
+                merged.put("quality", quality);
+            }
+            if (merged.optString("url", "").length() == 0) return -2;
+            if (index >= 0) source.put(index, merged); else source.put(merged);
+            context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                .putString("cameras_json", source.toString()).commit();
+
+            CameraWorker current = workers.remove(name);
+            if (current != null) current.stop();
+            if (merged.optBoolean("enabled", true)) {
+                CameraWorker worker = new CameraWorker(merged);
+                workers.put(name, worker);
+                worker.start();
+            }
+            addLog("INFO", (previous == null ? "Camera added: " : "Camera configuration updated: ") + name);
+            return 1;
+        } catch (Exception e) {
+            addLog("ERROR", "Camera configuration rejected for " + name + ": " + e.getMessage());
+            return -2;
+        }
+    }
+
+    // 1=success, 0=not found, -2=invalid configuration.
+    public synchronized int deleteCamera(String name) {
+        if (!running || name == null || !name.matches("[a-z][a-z0-9_]{0,31}")) return -2;
+        JSONArray source = readConfig();
+        JSONArray updated = new JSONArray();
+        boolean found = false;
+        for (int i=0; i<source.length(); i++) {
+            JSONObject item = source.optJSONObject(i);
+            if (item != null && name.equals(item.optString("name"))) found = true;
+            else if (item != null) updated.put(item);
+        }
+        if (!found) return 0;
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+            .putString("cameras_json", updated.toString()).commit();
+        CameraWorker current = workers.remove(name);
+        if (current != null) current.stop();
+        cameraCounters.remove(name);
+        addLog("INFO", "Camera deleted: " + name);
+        return 1;
+    }
+
+    // Validates and stores only fields supplied. portChanged is set by the HTTP layer after success.
+    public synchronized int updateGlobalConfig(JSONObject supplied) {
+        if (!running || supplied == null) return -2;
+        android.content.SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
+        android.content.SharedPreferences.Editor editor = prefs.edit();
+        try {
+            if (supplied.has("port")) {
+                int port = supplied.getInt("port");
+                if (port < 1 || port > 65535) return -2;
+                editor.putInt("http_port", port);
+            }
+            if (supplied.has("password")) {
+                if (!(supplied.opt("password") instanceof String)) return -2;
+                editor.putString("api_password", supplied.getString("password"));
+            }
+            editor.commit();
+            return 1;
+        } catch (Exception e) { return -2; }
+    }
+
     public JSONObject statusJson(int port) {
         try {
             JSONArray cameras = new JSONArray();
@@ -262,8 +382,8 @@ public class CameraRuntime {
             }
             boolean password = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 .getString("api_password", "").length() > 0;
-            return new JSONObject().put("http_port", context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-                .getInt("http_port", 8554)).put("camera_count", source.length())
+            int configuredPort = context.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("http_port", 8554);
+            return new JSONObject().put("port", configuredPort).put("http_port", configuredPort).put("camera_count", source.length())
                 .put("api_password_configured", password).put("cameras", cameras);
         } catch (Exception e) { return new JSONObject(); }
     }
