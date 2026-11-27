@@ -51,8 +51,10 @@ Snapshot возвращает 503 frame_not_ready, пока камера ещё 
 | GET | /api/v1/config | Публичная конфигурация камер; RTSP-пароли маскируются |
 | GET | /api/v1/version | Версии приложения и сведения о FFmpeg |
 | GET | /api/v1/logs | Последние сообщения приложения и stderr FFmpeg (до 200 записей) |
-| POST | /api/v1/camera/{name}/start | Запустить камеру |
-| POST | /api/v1/camera/{name}/stop | Остановить камеру |
+| POST | /api/v1/camera/{name}/start | Запустить камеру (совместимый псевдоним) |
+| POST | /api/v1/camera/{name}/stop | Остановить камеру (совместимый псевдоним) |
+| POST | /api/v1/camera/{name}/on | Включить камеру; повторный вызов ничего не перезапускает |
+| POST | /api/v1/camera/{name}/off | Выключить камеру; повторный вызов безопасен |
 | POST | /api/v1/camera/{name}/restart | Перезапустить камеру |
 | POST | /api/v1/cameras/restart | Перезапустить все процессы камер |
 | POST | /api/v1/service/restart | Перезапустить процессы камер, не останавливая HTTP-сервер |
@@ -65,6 +67,8 @@ Snapshot возвращает 503 frame_not_ready, пока камера ещё 
 curl http://АДРЕС_ПЛАНШЕТА:8554/api/v1/status
 curl -u api:ВАШ_ПАРОЛЬ http://АДРЕС_ПЛАНШЕТА:8554/api/v1/status
 curl -u api:ВАШ_ПАРОЛЬ http://АДРЕС_ПЛАНШЕТА:8554/api/v1/logs
+curl -u api:ВАШ_ПАРОЛЬ -X POST http://АДРЕС_ПЛАНШЕТА:8554/api/v1/camera/parking/on
+curl -u api:ВАШ_ПАРОЛЬ -X POST http://АДРЕС_ПЛАНШЕТА:8554/api/v1/camera/parking/off
 curl -u api:ВАШ_ПАРОЛЬ -X POST http://АДРЕС_ПЛАНШЕТА:8554/api/v1/camera/parking/restart
 curl http://АДРЕС_ПЛАНШЕТА:8554/cam/parking.jpg -o parking.jpg
 ~~~
