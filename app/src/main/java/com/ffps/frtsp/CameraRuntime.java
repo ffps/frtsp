@@ -245,6 +245,7 @@ public class CameraRuntime {
         private volatile int sourceWidth;
         private volatile int sourceHeight;
         private volatile long frameSequence;
+        private volatile Thread workerThread;
         private final AtomicLong frames = new AtomicLong();
         private final Object frameLock = new Object();
 
@@ -256,14 +257,17 @@ public class CameraRuntime {
         }
 
         void start() {
-            Thread thread=new Thread(this::runLoop,"fRTSP-"+name);
-            thread.start();
+            workerThread = new Thread(this::runLoop,"fRTSP-"+name);
+            workerThread.start();
         }
+
 
         void stop() {
             wanted=false; state="stopping";
             java.lang.Process p=process;
             if (p!=null) p.destroy();
+            Thread t = workerThread;
+            if (t != null) t.interrupt();
             synchronized(frameLock) { frameLock.notifyAll(); }
         }
 
@@ -271,6 +275,8 @@ public class CameraRuntime {
             restartRequested=true;
             java.lang.Process p=process;
             if (p!=null) p.destroy();
+            Thread t = workerThread;
+            if (t != null) t.interrupt();
             synchronized(frameLock) { frameLock.notifyAll(); }
         }
 
