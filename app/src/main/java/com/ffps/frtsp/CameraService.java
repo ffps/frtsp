@@ -20,6 +20,7 @@ public class CameraService extends Service {
     private static volatile boolean running;
     private static volatile String lastError;
     private static volatile CameraRuntime runtime;
+    private static volatile CameraService instance;
     private MjpegHttpServer server;
 
     public static boolean isRunning() { return running; }
@@ -28,6 +29,7 @@ public class CameraService extends Service {
 
     @Override public void onCreate() {
         super.onCreate();
+        instance = this;
         try {
             File ffmpeg = installFfmpeg();
             Intent launch = new Intent(this, MainActivity.class);
@@ -54,6 +56,33 @@ public class CameraService extends Service {
             if (runtime != null) runtime.stop();
             runtime = null;
             stopSelf();
+        }
+    }
+
+    public static void rebindHttpServer(int oldPort) {
+        CameraService service = instance;
+        if (service == null) return;
+        synchronized (service) {
+            if (!running) return;
+            MjpegHttpServer oldServer = service.server;
+            try {
+                MjpegHttpServer newServer = new MjpegHttpServer(service);
+                newServer.start();
+                service.server = newServer;
+                if (oldServer != null) oldServer.stop();
+                android.util.Log.i("fRTSP", "HTTP server moved to port " +
+                    service.getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554));
+            } catch (Exception e) {
+                service.getSharedPreferences("settings", MODE_PRIVATE).edit().putInt("http_port", oldPort).commit();
+                android.util.Log.e("fRTSP", "Cannot switch HTTP port; keeping " + oldPort, e);
+                try {
+                    if (service.server != null && service.server != oldServer) service.server.stop();
+                    service.server = new MjpegHttpServer(service);
+                    service.server.start();
+                } catch (Exception restoreError) {
+                    android.util.Log.e("fRTSP", "Cannot restore HTTP server on port " + oldPort, restoreError);
+                }
+            }
         }
     }
 
@@ -109,6 +138,7 @@ public class CameraService extends Service {
 
     @Override public void onDestroy() {
         running = false;
+        if (instance == this) instance = null;
         if (runtime != null) runtime.stop();
         runtime = null;
         if (server != null) server.stop();
