@@ -116,7 +116,9 @@ public class CameraService extends Service {
 
     private void installAdminPage() throws Exception {
         File target = new File(getFilesDir(), "index.html");
-        if (target.exists()) return;
+        long apkUpdateTime = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
+        android.content.SharedPreferences prefs = getSharedPreferences("admin_page", MODE_PRIVATE);
+        if (target.exists() && prefs.getLong("apk_update_time", 0) == apkUpdateTime) return;
         InputStream input = null;
         FileOutputStream output = null;
         try {
@@ -127,6 +129,7 @@ public class CameraService extends Service {
             while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
             output.flush();
             output.getFD().sync();
+            prefs.edit().putLong("apk_update_time", apkUpdateTime).commit();
         } finally {
             if (input != null) try { input.close(); } catch (Exception ignored) { }
             if (output != null) try { output.close(); } catch (Exception ignored) { }
