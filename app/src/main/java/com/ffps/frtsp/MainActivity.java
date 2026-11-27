@@ -116,6 +116,7 @@ public class MainActivity extends Activity {
         root.addView(hint);
 
         serviceButton = makeButton("START SERVICE", Color.rgb(46, 125, 50));
+        serviceButton.setPadding(dp(16), serviceButton.getPaddingTop(), dp(16), serviceButton.getPaddingBottom());
         LinearLayout.LayoutParams serviceParams = new LinearLayout.LayoutParams(-2, dp(50));
         serviceParams.topMargin = dp(20);
         serviceParams.gravity = Gravity.CENTER_HORIZONTAL;

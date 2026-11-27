@@ -10,7 +10,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -91,7 +90,6 @@ public class CameraSettingsActivity extends Activity {
         addCell(header, "URL", 3.2f, true);
         addCell(header, "FPS", 0.6f, true);
         addCell(header, "Quality", 0.9f, true);
-        addCell(header, "Action", 0.8f, true);
 
         cameraRows = new LinearLayout(this);
         cameraRows.setOrientation(LinearLayout.VERTICAL);
@@ -195,16 +193,6 @@ public class CameraSettingsActivity extends Activity {
             addTextCell(row, String.valueOf(camera.fps), 0.6f, true);
             addTextCell(row, String.valueOf(camera.quality), 0.9f, true);
 
-            LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
-            actions.setGravity(Gravity.CENTER);
-            row.addView(actions, new LinearLayout.LayoutParams(0, -1, 0.8f));
-
-            ImageButton delete = iconButton(android.R.drawable.ic_menu_delete, "Delete");
-            actions.addView(delete, new LinearLayout.LayoutParams(dp(44), dp(44)));
-            delete.setOnClickListener(v -> {
-                if (!CameraService.isRunning()) confirmDelete(index);
-            });
         }
     }
 
@@ -260,13 +248,15 @@ public class CameraSettingsActivity extends Activity {
         enabledInput.setChecked(!editing || original.enabled);
         form.addView(enabledInput);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this)
             .setTitle(editing ? "Edit camera" : "Add camera")
             .setView(form)
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save", null)
-            .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            .setPositiveButton("Save", null);
+        if (editing) dialogBuilder.setNeutralButton("Delete", null);
+        AlertDialog dialog = dialogBuilder.create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
             String url = normalizeRtspUrl(urlInput.getText().toString().trim());
             int fps;
@@ -309,22 +299,27 @@ public class CameraSettingsActivity extends Activity {
             saveCameras();
             renderRows();
             dialog.dismiss();
-        }));
+            });
+            if (editing) {
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> confirmDelete(original, dialog));
+            }
+        });
         dialog.show();
     }
 
-    private void confirmDelete(int index) {
+    private void confirmDelete(CameraEntry camera, AlertDialog editDialog) {
         if (CameraService.isRunning()) return;
-        String name = cameras.get(index).name;
         new AlertDialog.Builder(this)
             .setTitle("Delete camera?")
-            .setMessage("Remove camera '" + name + "' from the configuration?")
+            .setMessage("Remove camera '" + camera.name + "' from the configuration?")
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Delete", (dialog, which) -> {
+            .setPositiveButton("Delete", (confirmation, which) -> {
                 if (CameraService.isRunning()) return;
-                cameras.remove(index);
-                saveCameras();
-                renderRows();
+                if (cameras.remove(camera)) {
+                    saveCameras();
+                    renderRows();
+                    editDialog.dismiss();
+                }
             })
             .show();
     }
@@ -387,15 +382,6 @@ public class CameraSettingsActivity extends Activity {
         return label;
     }
 
-    private ImageButton iconButton(int resource, String description) {
-        ImageButton button = new ImageButton(this);
-        button.setImageResource(resource);
-        button.setContentDescription(description);
-        button.setBackgroundDrawable(buttonBackground(0xffe2e7eb));
-        button.setPadding(dp(8), dp(8), dp(8), dp(8));
-        return button;
-    }
-
     private void addCell(LinearLayout row, String text, float weight, boolean centered) {
         TextView cell = new TextView(this);
         cell.setText(text);
@@ -427,7 +413,7 @@ public class CameraSettingsActivity extends Activity {
 
     @Override public boolean onCreateOptionsMenu(Menu menu) {
         addMenuItem = menu.add(0, 10, 0, "Add camera");
-        addMenuItem.setIcon(android.R.drawable.ic_menu_add);
+        addMenuItem.setIcon(R.drawable.ic_add);
         addMenuItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
         addMenuItem.setEnabled(!CameraService.isRunning());
 

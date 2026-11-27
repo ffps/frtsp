@@ -34,7 +34,7 @@ public class CameraService extends Service {
             Notification notification = new Notification.Builder(this)
                 .setContentTitle("fRTSP server is running")
                 .setContentText(serverUrl)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_stat_frtsp)
                 .setContentIntent(pending)
                 .getNotification();
             startForeground(1, notification);
