@@ -22,6 +22,7 @@ public class CameraService extends Service {
     private static volatile CameraRuntime runtime;
     private static volatile CameraService instance;
     private MjpegHttpServer server;
+    private MjpegHttpServer pendingOldServer;
 
     public static boolean isRunning() { return running; }
     public static String getLastError() { return lastError; }
@@ -59,24 +60,33 @@ public class CameraService extends Service {
         }
     }
 
-    public static void rebindHttpServer(int oldPort) {
+    public static synchronized boolean prepareHttpServerSwitch(int oldPort) {
         CameraService service = instance;
-        if (service == null) return;
+        if (service == null || !running) return false;
         synchronized (service) {
-            if (!running) return;
-            MjpegHttpServer oldServer = service.server;
             try {
                 MjpegHttpServer newServer = new MjpegHttpServer(service);
                 newServer.start();
+                service.pendingOldServer = service.server;
                 service.server = newServer;
-                if (oldServer != null) oldServer.stop();
-                android.util.Log.i("fRTSP", "HTTP server moved to port " +
-                    service.getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554));
+                return true;
             } catch (Exception e) {
                 service.getSharedPreferences("settings", MODE_PRIVATE).edit().putInt("http_port", oldPort).commit();
-                service.server = oldServer;
                 android.util.Log.e("fRTSP", "Cannot switch HTTP port; keeping " + oldPort, e);
+                return false;
             }
+        }
+    }
+
+    public static synchronized void finishHttpServerSwitch() {
+        CameraService service = instance;
+        if (service == null) return;
+        synchronized (service) {
+            MjpegHttpServer oldServer = service.pendingOldServer;
+            service.pendingOldServer = null;
+            if (oldServer != null) oldServer.stop();
+            android.util.Log.i("fRTSP", "HTTP listener switched to port " +
+                service.getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554));
         }
     }
 
