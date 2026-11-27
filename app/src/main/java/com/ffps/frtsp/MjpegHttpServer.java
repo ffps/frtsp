@@ -69,11 +69,18 @@ public class MjpegHttpServer {
             String method = request[0];
             String path = request[1];
             String auth = null;
+            int contentLength = 0;
             String line;
             while ((line = in.readLine()) != null && line.length() > 0) {
                 int colon = line.indexOf(':');
-                if (colon > 0 && line.substring(0, colon).trim().equalsIgnoreCase("Authorization"))
-                    auth = line.substring(colon + 1).trim();
+                if (colon > 0) {
+                    String headerName = line.substring(0, colon).trim();
+                    String headerValue = line.substring(colon + 1).trim();
+                    if (headerName.equalsIgnoreCase("Authorization")) auth = headerValue;
+                    else if (headerName.equalsIgnoreCase("Content-Length")) {
+                        try { contentLength = Integer.parseInt(headerValue); } catch (Exception ignored) { contentLength = -1; }
+                    }
+                }
             }
 
             if (path.startsWith("/api/")) {
@@ -81,7 +88,12 @@ public class MjpegHttpServer {
                     out.write(("HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"fRTSP API\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
                     return;
                 }
-                handleApi(method, path, out);
+                if (contentLength < 0 || contentLength > 65536) {
+                    respond(out, 413, "Payload Too Large", jsonError("invalid_content_length"));
+                    return;
+                }
+                String body = readRequestBody(in, contentLength);
+                handleApi(method, path, body, out);
                 return;
             }
 
@@ -108,7 +120,18 @@ public class MjpegHttpServer {
         }
     }
 
-    private void handleApi(String method, String path, OutputStream out) throws Exception {
+    private String readRequestBody(BufferedReader in, int contentLength) throws Exception {
+        if (contentLength == 0) return "";
+        byte[] bytes = new byte[contentLength];
+        for (int i = 0; i < contentLength; i++) {
+            int value = in.read();
+            if (value < 0) throw new java.io.EOFException("Incomplete request body");
+            bytes[i] = (byte) value;
+        }
+        return new String(bytes, "UTF-8");
+    }
+
+    private void handleApi(String method, String path, String body, OutputStream out) throws Exception {
         CameraRuntime runtime = CameraService.getRuntime();
         if ("GET".equals(method)) {
             if ("/api/v1/status".equals(path)) {
@@ -118,6 +141,15 @@ public class MjpegHttpServer {
                     .put("version", BuildConfig.VERSION_NAME).put("ffmpeg", "bundled") : runtime.versionJson());
             } else if ("/api/v1/config".equals(path)) {
                 respond(out, 200, "OK", runtime == null ? configWithoutRuntime() : runtime.configJson());
+            } else if (path.startsWith("/api/v1/camera/") && path.endsWith("/config")) {
+                String name = path.substring("/api/v1/camera/".length(), path.length() - "/config".length());
+                if (runtime == null || name.length() == 0 || name.contains("/")) {
+                    respond(out, 404, "Not Found", jsonError("camera_not_found"));
+                } else {
+                    JSONObject cameraConfig = runtime.cameraConfigJson(name);
+                    if (cameraConfig == null) respond(out, 404, "Not Found", jsonError("camera_not_found"));
+                    else respond(out, 200, "OK", cameraConfig);
+                }
             } else if ("/api/v1/stats".equals(path)) {
                 respond(out, 200, "OK", runtime == null ? new JSONObject() : runtime.statsJson());
             } else if ("/api/v1/logs".equals(path)) {
@@ -128,12 +160,28 @@ public class MjpegHttpServer {
             return;
         }
 
-        if (!"POST".equals(method)) {
+        if (!"POST".equals(method) && !"PUT".equals(method) && !"DELETE".equals(method)) {
             respond(out, 405, "Method Not Allowed", jsonError("method_not_allowed"));
             return;
         }
         if (runtime == null || !runtime.isRunning()) {
             respond(out, 503, "Service Unavailable", jsonError("service_not_running"));
+            return;
+        }
+
+        if ("POST".equals(method) && "/api/v1/config".equals(path)) {
+            JSONObject supplied;
+            try { supplied = new JSONObject(body); }
+            catch (Exception e) { respond(out, 400, "Bad Request", jsonError("invalid_json")); return; }
+            int oldPort = port;
+            int result = runtime.updateGlobalConfig(supplied);
+            if (result != 1) { respond(out, 400, "Bad Request", jsonError("invalid_config")); return; }
+            int newPort = context.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("http_port", 8554);
+            respond(out, 200, "OK", new JSONObject().put("ok", true).put("port", newPort)
+                .put("port_changed", newPort != oldPort));
+            if (newPort != oldPort) {
+                new Thread(() -> CameraService.rebindHttpServer(oldPort), "fRTSP-http-rebind").start();
+            }
             return;
         }
         if ("/api/v1/cameras/restart".equals(path)) {
@@ -149,10 +197,44 @@ public class MjpegHttpServer {
         String prefix = "/api/v1/camera/";
         if (path.startsWith(prefix)) {
             String tail = path.substring(prefix.length());
+            if ("PUT".equals(method) || "DELETE".equals(method)) {
+                if (tail.length() == 0 || tail.contains("/")) {
+                    respond(out, 400, "Bad Request", jsonError("invalid_camera_name")); return;
+                }
+                int result;
+                if ("DELETE".equals(method)) {
+                    result = runtime.deleteCamera(tail);
+                } else {
+                    JSONObject supplied;
+                    try { supplied = new JSONObject(body); }
+                    catch (Exception e) { respond(out, 400, "Bad Request", jsonError("invalid_json")); return; }
+                    result = runtime.saveCameraConfig(tail, supplied, true);
+                }
+                if (result == 1) respond(out, "DELETE".equals(method) ? 200 : 201,
+                    "DELETE".equals(method) ? "OK" : "Created",
+                    new JSONObject().put("ok", true).put("camera", tail)
+                        .put("action", "DELETE".equals(method) ? "delete" : "create"));
+                else if (result == 0) respond(out, 404, "Not Found", jsonError("camera_not_found"));
+                else if (result == -1) respond(out, 409, "Conflict", jsonError("camera_already_exists"));
+                else respond(out, 400, "Bad Request", jsonError("invalid_camera_config"));
+                return;
+            }
+
             int slash = tail.lastIndexOf('/');
             if (slash <= 0) { respond(out, 400, "Bad Request", jsonError("invalid_camera_action")); return; }
             String name = tail.substring(0, slash);
             String action = tail.substring(slash + 1);
+            if ("POST".equals(method) && "config".equals(action)) {
+                JSONObject supplied;
+                try { supplied = new JSONObject(body); }
+                catch (Exception e) { respond(out, 400, "Bad Request", jsonError("invalid_json")); return; }
+                int result = runtime.saveCameraConfig(name, supplied, false);
+                if (result == 1) respond(out, 200, "OK", new JSONObject().put("ok", true).put("camera", name).put("action", "config"));
+                else if (result == 0) respond(out, 404, "Not Found", jsonError("camera_not_found"));
+                else respond(out, 400, "Bad Request", jsonError("invalid_camera_config"));
+                return;
+            }
+            if (!"POST".equals(method)) { respond(out, 405, "Method Not Allowed", jsonError("method_not_allowed")); return; }
             boolean ok = false;
             if ("restart".equals(action)) ok = runtime.startCamera(name);
             else if ("start".equals(action)) ok = runtime.startCamera(name);
