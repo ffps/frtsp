@@ -157,6 +157,8 @@ public class MjpegHttpServer {
             if ("restart".equals(action)) ok = runtime.startCamera(name);
             else if ("start".equals(action)) ok = runtime.startCamera(name);
             else if ("stop".equals(action)) ok = runtime.stopCamera(name);
+            else if ("on".equals(action)) ok = runtime.setCameraEnabled(name, true);
+            else if ("off".equals(action)) ok = runtime.setCameraEnabled(name, false);
             if (!ok) {
                 respond(out, 404, "Not Found", jsonError("camera_not_found_or_action_failed"));
             } else {
