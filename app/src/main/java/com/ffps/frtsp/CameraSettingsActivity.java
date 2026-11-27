@@ -6,10 +6,10 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -31,7 +31,7 @@ public class CameraSettingsActivity extends Activity {
     private final List<CameraEntry> cameras = new ArrayList<>();
     private LinearLayout cameraRows;
     private TextView serviceNotice;
-    private Button addButton;
+    private MenuItem addMenuItem;
     private final android.os.Handler handler = new android.os.Handler();
     private final Runnable stateUpdater = new Runnable() {
         @Override public void run() {
@@ -65,17 +65,7 @@ public class CameraSettingsActivity extends Activity {
         root.setPadding(dp(12), dp(12), dp(12), dp(8));
         root.setBackgroundColor(0xffffffff);
 
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(tabs, new LinearLayout.LayoutParams(-1, dp(46)));
-        Button settingsTab = tabButton("SETTINGS", 0xff777f88);
-        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, -1, 1));
-        Button camerasTab = tabButton("CAMERAS", 0xff3773be);
-        LinearLayout.LayoutParams tab2 = new LinearLayout.LayoutParams(0, -1, 1);
-        tab2.leftMargin = dp(6);
-        tabs.addView(camerasTab, tab2);
-        camerasTab.setEnabled(false);
-        settingsTab.setOnClickListener(v -> finish());
+        setTitle("Cameras");
 
         serviceNotice = new TextView(this);
         serviceNotice.setTextSize(13);
@@ -83,39 +73,29 @@ public class CameraSettingsActivity extends Activity {
         serviceNotice.setPadding(dp(4), dp(8), dp(4), dp(4));
         root.addView(serviceNotice);
 
-        addButton = tabButton("ADD CAMERA", 0xff477eae);
-        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(44));
-        addParams.topMargin = dp(6);
-        root.addView(addButton, addParams);
-        addButton.setOnClickListener(v -> showCameraDialog(-1));
-
-        HorizontalScrollView horizontal = new HorizontalScrollView(this);
-        horizontal.setFillViewport(false);
-        horizontal.setHorizontalScrollBarEnabled(true);
         LinearLayout.LayoutParams tableScrollParams = new LinearLayout.LayoutParams(-1, 0, 1);
         tableScrollParams.topMargin = dp(10);
-        root.addView(horizontal, tableScrollParams);
+        ScrollView vertical = new ScrollView(this);
+        root.addView(vertical, tableScrollParams);
 
         LinearLayout table = new LinearLayout(this);
         table.setOrientation(LinearLayout.VERTICAL);
-        horizontal.addView(table);
+        vertical.addView(table, new ScrollView.LayoutParams(-1, -2));
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setBackgroundColor(0xffe5e9ed);
-        table.addView(header);
-        addCell(header, "Enabled", 76, true);
-        addCell(header, "Name", 88, true);
-        addCell(header, "URL", 250, true);
-        addCell(header, "FPS", 48, true);
-        addCell(header, "Quality", 66, true);
-        addCell(header, "Action", 92, true);
+        table.addView(header, new LinearLayout.LayoutParams(-1, dp(42)));
+        addCell(header, "Enabled", 0.9f, true);
+        addCell(header, "Name", 1.0f, true);
+        addCell(header, "URL", 3.2f, true);
+        addCell(header, "FPS", 0.6f, true);
+        addCell(header, "Quality", 0.9f, true);
+        addCell(header, "", 0.8f, true);
 
-        ScrollView vertical = new ScrollView(this);
-        table.addView(vertical, new LinearLayout.LayoutParams(-1, -1));
         cameraRows = new LinearLayout(this);
         cameraRows.setOrientation(LinearLayout.VERTICAL);
-        vertical.addView(cameraRows);
+        table.addView(cameraRows, new LinearLayout.LayoutParams(-1, -2));
 
         setContentView(root);
         renderRows();
@@ -176,13 +156,11 @@ public class CameraSettingsActivity extends Activity {
     private void renderRows() {
         cameraRows.removeAllViews();
         if (cameras.isEmpty()) {
-            LinearLayout row = new LinearLayout(this);
-            cameraRows.addView(row);
             TextView empty = new TextView(this);
             empty.setText("No cameras configured");
             empty.setTextColor(0xff666666);
             empty.setPadding(dp(8), dp(14), dp(8), dp(14));
-            row.addView(empty);
+            cameraRows.addView(empty, new LinearLayout.LayoutParams(-1, dp(48)));
             return;
         }
 
@@ -193,7 +171,11 @@ public class CameraSettingsActivity extends Activity {
             row.setOrientation(LinearLayout.HORIZONTAL);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setBackgroundColor(i % 2 == 0 ? 0xfffafbfc : 0xfff0f2f4);
-            cameraRows.addView(row, new LinearLayout.LayoutParams(-2, dp(54)));
+            row.setClickable(true);
+            row.setOnClickListener(v -> {
+                if (!CameraService.isRunning()) showCameraDialog(index);
+            });
+            cameraRows.addView(row, new LinearLayout.LayoutParams(-1, dp(54)));
 
             CheckBox enabled = new CheckBox(this);
             enabled.setGravity(Gravity.CENTER);
@@ -206,26 +188,20 @@ public class CameraSettingsActivity extends Activity {
                 camera.enabled = checked;
                 saveCameras();
             });
-            addViewCell(row, enabled, 76);
+            addViewCell(row, enabled, 0.9f);
 
-            addTextCell(row, camera.name, 88, true);
-            addTextCell(row, camera.url, 250, false);
-            addTextCell(row, String.valueOf(camera.fps), 48, true);
-            addTextCell(row, String.valueOf(camera.quality), 66, true);
+            addTextCell(row, camera.name, 1.0f, true);
+            addTextCell(row, camera.url, 3.2f, false);
+            addTextCell(row, String.valueOf(camera.fps), 0.6f, true);
+            addTextCell(row, String.valueOf(camera.quality), 0.9f, true);
 
             LinearLayout actions = new LinearLayout(this);
             actions.setOrientation(LinearLayout.HORIZONTAL);
             actions.setGravity(Gravity.CENTER);
-            row.addView(actions, new LinearLayout.LayoutParams(dp(92), -1));
-
-            ImageButton edit = iconButton(android.R.drawable.ic_menu_edit, "Edit");
-            actions.addView(edit, new LinearLayout.LayoutParams(dp(42), dp(42)));
-            edit.setOnClickListener(v -> {
-                if (!CameraService.isRunning()) showCameraDialog(index);
-            });
+            row.addView(actions, new LinearLayout.LayoutParams(0, -1, 0.8f));
 
             ImageButton delete = iconButton(android.R.drawable.ic_menu_delete, "Delete");
-            actions.addView(delete, new LinearLayout.LayoutParams(dp(42), dp(42)));
+            actions.addView(delete, new LinearLayout.LayoutParams(dp(44), dp(44)));
             delete.setOnClickListener(v -> {
                 if (!CameraService.isRunning()) confirmDelete(index);
             });
@@ -355,8 +331,7 @@ public class CameraSettingsActivity extends Activity {
 
     private void updateEditableState() {
         boolean editable = !CameraService.isRunning();
-        addButton.setEnabled(editable);
-        addButton.setAlpha(editable ? 1f : 0.45f);
+        if (addMenuItem != null) addMenuItem.setEnabled(editable);
         serviceNotice.setText(editable ? "" : "Service is running — camera settings are read-only.");
         for (int i = 0; i < cameraRows.getChildCount(); i++) {
             View row = cameraRows.getChildAt(i);
@@ -412,17 +387,6 @@ public class CameraSettingsActivity extends Activity {
         return label;
     }
 
-    private Button tabButton(String text, int color) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setTextSize(12);
-        button.setTextColor(0xffffffff);
-        button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-        button.setAllCaps(true);
-        button.setBackgroundDrawable(buttonBackground(color));
-        return button;
-    }
-
     private ImageButton iconButton(int resource, String description) {
         ImageButton button = new ImageButton(this);
         button.setImageResource(resource);
@@ -432,44 +396,64 @@ public class CameraSettingsActivity extends Activity {
         return button;
     }
 
-    private void addCell(LinearLayout row, String text, int widthDp, boolean centered) {
+    private void addCell(LinearLayout row, String text, float weight, boolean centered) {
         TextView cell = new TextView(this);
         cell.setText(text);
         cell.setTextSize(12);
         cell.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         cell.setTextColor(0xff333333);
         cell.setGravity(centered ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
-        cell.setPadding(dp(5), dp(6), dp(5), dp(6));
-        row.addView(cell, new LinearLayout.LayoutParams(dp(widthDp), dp(42)));
+        cell.setPadding(dp(3), dp(6), dp(3), dp(6));
+        row.addView(cell, new LinearLayout.LayoutParams(0, -1, weight));
     }
 
-    private void addTextCell(LinearLayout row, String text, int widthDp, boolean centered) {
+    private void addTextCell(LinearLayout row, String text, float weight, boolean centered) {
         TextView cell = new TextView(this);
         cell.setText(text);
         cell.setTextSize(12);
         cell.setTextColor(0xff333333);
         cell.setGravity(centered ? Gravity.CENTER : Gravity.CENTER_VERTICAL);
-        cell.setPadding(dp(5), dp(4), dp(5), dp(4));
+        cell.setPadding(dp(3), dp(4), dp(3), dp(4));
         if (!centered) cell.setSingleLine(true);
-        row.addView(cell, new LinearLayout.LayoutParams(dp(widthDp), -1));
+        row.addView(cell, new LinearLayout.LayoutParams(0, -1, weight));
     }
 
-    private void addViewCell(LinearLayout row, View view, int widthDp) {
+    private void addViewCell(LinearLayout row, View view, float weight) {
         LinearLayout holder = new LinearLayout(this);
         holder.setGravity(Gravity.CENTER);
         holder.addView(view, new LinearLayout.LayoutParams(dp(42), dp(46)));
-        row.addView(holder, new LinearLayout.LayoutParams(dp(widthDp), -1));
+        row.addView(holder, new LinearLayout.LayoutParams(0, -1, weight));
     }
 
-    private Button makeButton(String text, int color) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setTextSize(13);
-        button.setTextColor(0xffffffff);
-        button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-        button.setAllCaps(true);
-        button.setBackgroundDrawable(buttonBackground(color));
-        return button;
+    @Override public boolean onCreateOptionsMenu(Menu menu) {
+        addMenuItem = menu.add(0, 10, 0, "Add camera");
+        addMenuItem.setIcon(android.R.drawable.ic_menu_add);
+        addMenuItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS);
+        addMenuItem.setEnabled(!CameraService.isRunning());
+
+        menu.add(0, 11, 1, "Settings")
+            .setIcon(android.R.drawable.ic_menu_preferences)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        menu.add(0, 12, 2, "About")
+            .setIcon(android.R.drawable.ic_menu_info_details)
+            .setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER);
+        return true;
+    }
+
+    @Override public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == 10) {
+            if (!CameraService.isRunning()) showCameraDialog(-1);
+            return true;
+        }
+        if (item.getItemId() == 11) {
+            finish();
+            return true;
+        }
+        if (item.getItemId() == 12) {
+            AboutDialog.show(this);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private android.graphics.drawable.GradientDrawable buttonBackground(int color) {

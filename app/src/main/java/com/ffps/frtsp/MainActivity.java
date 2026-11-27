@@ -58,19 +58,7 @@ public class MainActivity extends Activity {
         status.setPadding(dp(8), 0, dp(8), 0);
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(38)));
 
-        LinearLayout tabs = new LinearLayout(this);
-        tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(0, dp(4), 0, dp(8));
-        root.addView(tabs, new LinearLayout.LayoutParams(-1, dp(48)));
-        Button settingsTab = makeButton("SETTINGS", Color.rgb(55, 115, 190));
-        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, -1, 1));
-        Button camerasTab = makeButton("CAMERAS", Color.rgb(115, 125, 135));
-        LinearLayout.LayoutParams camerasTabParams = new LinearLayout.LayoutParams(0, -1, 1);
-        camerasTabParams.leftMargin = dp(6);
-        tabs.addView(camerasTab, camerasTabParams);
-        settingsTab.setEnabled(false);
-        camerasTab.setOnClickListener(v ->
-            startActivity(new Intent(this, CameraSettingsActivity.class)));
+        setTitle("fRTSP");
 
         TextView portLabel = new TextView(this);
         portLabel.setText("Port");
@@ -243,16 +231,26 @@ public class MainActivity extends Activity {
         return "DEVICE_IP";
     }
 
-    private Button makeButton(String text, int color) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setTextSize(13);
-        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setTextColor(Color.WHITE);
-        button.setAllCaps(true);
-        button.setPadding(dp(20), 0, dp(20), 0);
-        button.setBackgroundDrawable(buttonBackground(color));
-        return button;
+    @Override public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        menu.add(0, 1, 0, "Cameras")
+            .setIcon(android.R.drawable.ic_menu_camera)
+            .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER);
+        menu.add(0, 2, 1, "About")
+            .setIcon(android.R.drawable.ic_menu_info_details)
+            .setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER);
+        return true;
+    }
+
+    @Override public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == 1) {
+            startActivity(new Intent(this, CameraSettingsActivity.class));
+            return true;
+        }
+        if (item.getItemId() == 2) {
+            AboutDialog.show(this);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private GradientDrawable buttonBackground(int color) {
