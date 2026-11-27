@@ -62,7 +62,7 @@ public class CameraSettingsActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(12), dp(12), dp(12), dp(8));
+        root.setPadding(0, dp(8), 0, dp(4));
         root.setBackgroundColor(0xffffffff);
 
         setTitle("Cameras");
@@ -91,7 +91,7 @@ public class CameraSettingsActivity extends Activity {
         addCell(header, "URL", 3.2f, true);
         addCell(header, "FPS", 0.6f, true);
         addCell(header, "Quality", 0.9f, true);
-        addCell(header, "", 0.8f, true);
+        addCell(header, "Action", 0.8f, true);
 
         cameraRows = new LinearLayout(this);
         cameraRows.setOrientation(LinearLayout.VERTICAL);
