@@ -2,10 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
-def refName = System.getenv("GITHUB_REF_NAME") ?: "v0.1.0"
-def cleanVersion = refName.replaceFirst("^v", "")
-if (!(cleanVersion ==~ /\\d+\\.\\d+\\.\\d+/)) {
-    cleanVersion = "0.1.0"
+def tagVersion = System.getenv("GITHUB_REF_NAME") ?: ""
+def cleanVersion = tagVersion.replaceFirst("^v", "")
+if (!(cleanVersion ==~ /\d+\.\d+\.\d+/)) {
+    throw new GradleException("Build must be started from a version tag vX.Y.Z; got: " + tagVersion)
 }
 def parts = cleanVersion.tokenize(".").collect { it.toInteger() }
 def versionCodeValue = parts[0] * 1000000 + parts[1] * 1000 + parts[2]

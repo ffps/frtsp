@@ -1,57 +1,83 @@
-# <p align="center"><img src="assets/icon.svg" /><br />fRTSP — простой конвертер RTSP → MJPEG</p>
+# fRTSP — конвертер RTSP → MJPEG для Android
 
-Android application for converting RTSP camera streams to MJPEG over HTTP.
+Приложение предназначено для преобразования видеопотоков RTSP с IP-камер в MJPEG по HTTP. Целевая платформа — старые Android-устройства, в том числе Android 4.2.1 (API 17).
 
-## Current scaffold
+## Текущее состояние
 
-- Android minSdk 17 (Android 4.2.1), Java.
-- HTTP server listens on `0.0.0.0:8554` so other devices on the same LAN can reach it.
-- Pretty-printed JSON API at `/api/v1/status`, `/stats`, `/config`, `/version`, `/logs`.
-- API requests from loopback do not require authentication.
-- API requests from other addresses require Basic Auth (`api:<password>`). An empty password denies external API requests.
-- API password is configured in the app settings screen and stored in private SharedPreferences.
-- MJPEG routes are reserved but currently return 503 until FFmpeg camera pipeline is added.
+Сейчас в репозитории находится начальный каркас приложения:
 
-## FFmpeg binary
+- Java, `minSdk 17` (Android 4.2.1).
+- HTTP-сервер слушает порт `8554` на всех сетевых интерфейсах.
+- JSON API возвращает форматированный JSON.
+- Запросы к API с localhost не требуют авторизации.
+- Для запросов к API с других IP-адресов требуется Basic Auth: логин `api`, пароль задаётся в приложении.
+- Если пароль API не задан, внешние запросы к API запрещены.
+- Пароль хранится в закрытых настройках приложения и не должен попадать в ответы API.
+- Запуск FFmpeg и обработка RTSP-потоков пока не реализованы. Адреса камер на этом этапе возвращают HTTP 503.
 
-Place the already-built Android ARMv7 FFmpeg 3.3.2 executable here:
+Корневой адрес сервера не является веб-панелью. Для получения состояния используйте JSON API.
 
-`app/src/main/assets/ffmpeg-armv7`
+## HTTP и JSON API
 
-It must be the tested executable with H.264/HEVC decoders, MJPEG encoder and `image2pipe` support. Do not rebuild it.
+Порт сервера: `8554`.
 
-## Build
+Текущие API-адреса:
 
-Requires JDK 11 and Gradle 7.6.4:
+| Метод | Адрес | Назначение |
+|---|---|---|
+| GET | `/api/v1/status` | Состояние сервера и приложения |
+| GET | `/api/v1/stats` | Счётчики и статистика |
+| GET | `/api/v1/config` | Публичная часть конфигурации |
+| GET | `/api/v1/version` | Версии приложения и FFmpeg |
+| GET | `/api/v1/logs` | Последние сообщения журнала |
 
-```bash
-gradle assembleDebug
-```
-
-Release builds are triggered by pushing a tag such as `v0.1.0`.
-
-GitHub Actions secrets:
-- `KEYSTORE_BASE64`
-- `KEY_ALIAS`
-- `KEYSTORE_PASSWORD`
-- `KEY_PASSWORD`
-
-For unsigned test builds, omit signing secrets. The version name comes from the tag; version code is `major*1000000 + minor*1000 + patch`.
-
-## API authentication
-
-Username is fixed to `api`. Example:
+Пример запроса к API с другого устройства в локальной сети:
 
 ```bash
-curl -u api:YOUR_PASSWORD http://TABLET_IP:8554/api/v1/status
+curl -u api:ВАШ_ПАРОЛЬ http://АДРЕС_ПЛАНШЕТА:8554/api/v1/status
 ```
 
-Camera MJPEG URLs when the pipeline is implemented:
+После реализации видеоконвейера планируются адреса:
 
-- `http://TABLET_IP:8554/camera/1`
-- `http://TABLET_IP:8554/camera/1.jpg`
+- `http://АДРЕС_ПЛАНШЕТА:8554/camera/1` — MJPEG-поток;
+- `http://АДРЕС_ПЛАНШЕТА:8554/camera/1.jpg` — последний JPEG-кадр.
 
+**Важно:** Basic Auth не шифрует соединение. Используйте API только в доверенной локальной сети; не публикуйте порт сервера напрямую в интернете.
 
-## Лицензия
+## FFmpeg
 
-Код написан ChatGPT (OpenAI) free. Лицензия: свободное использование.
+В репозитории находится ранее собранный исполняемый файл FFmpeg 3.3.2 для Android ARMv7:
+
+`app/src/main/assets/ffmpeg-armv7/ffmpeg`
+
+Это уже проверенная сборка с декодерами H.264 и HEVC, MJPEG-кодировщиком и поддержкой `image2pipe`. Пересобирать FFmpeg без необходимости не нужно.
+
+## Сборка APK
+
+Релизная сборка запускается **только при отправке в GitHub тега версии** в формате `vX.Y.Z`, например:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+GitHub Actions соберёт APK и опубликует его в GitHub Releases под именем:
+
+`fRTSP-X.Y.Z.apk`
+
+Для сборки используется JDK 11 и Gradle 7.6.4. В GitHub Actions можно настроить секреты подписи:
+
+- `KEYSTORE_BASE64` — файл keystore в Base64;
+- `KEY_ALIAS` — alias ключа;
+- `KEYSTORE_PASSWORD` — пароль keystore;
+- `KEY_PASSWORD` — пароль ключа.
+
+Если секреты подписи не заданы, будет собран неподписанный release APK, который нельзя устанавливать как обычное подписанное обновление поверх другой сборки.
+
+Имя версии APK берётся из тега. Код версии вычисляется по формуле `major * 1000000 + minor * 1000 + patch`.
+
+## Совместимость
+
+- Минимальная версия Android: 4.2.1 (API 17).
+- Архитектура FFmpeg: ARMv7.
+- Язык приложения: Java.
