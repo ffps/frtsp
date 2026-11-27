@@ -98,6 +98,27 @@ public class CameraRuntime {
         return true;
     }
 
+    public synchronized boolean setCameraEnabled(String name, boolean enabled) {
+        if (!running) return false;
+        JSONObject item = findConfig(name);
+        if (item == null) return false;
+        CameraWorker current = workers.get(name);
+        if (enabled) {
+            if (current != null) return true;
+            CameraWorker worker = new CameraWorker(item);
+            workers.put(name, worker);
+            worker.start();
+            addLog("INFO", "Camera enabled: " + name);
+            return true;
+        }
+        if (current != null) {
+            workers.remove(name);
+            current.stop();
+            addLog("INFO", "Camera disabled: " + name);
+        }
+        return true;
+    }
+
     private JSONArray readConfig() {
         String raw = context.getSharedPreferences("settings", Context.MODE_PRIVATE).getString("cameras_json", "[]");
         try { return new JSONArray(raw); } catch (Exception e) { return new JSONArray(); }
