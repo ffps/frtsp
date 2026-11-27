@@ -433,6 +433,7 @@ public class CameraSettingsActivity extends Activity {
         }
         if (item.getItemId() == 11) {
             finish();
+            overridePendingTransition(0, 0);
             return true;
         }
         if (item.getItemId() == 12) {
@@ -440,6 +441,11 @@ public class CameraSettingsActivity extends Activity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override public void onBackPressed() {
+        super.onBackPressed();
+        overridePendingTransition(0, 0);
     }
 
     private android.graphics.drawable.GradientDrawable buttonBackground(int color) {

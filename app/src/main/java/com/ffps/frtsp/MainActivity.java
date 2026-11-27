@@ -130,8 +130,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams editCamerasParams = new LinearLayout.LayoutParams(dp(76), dp(44));
         editCamerasParams.leftMargin = dp(8);
         camerasRow.addView(editCamerasButton, editCamerasParams);
-        editCamerasButton.setOnClickListener(v ->
-            startActivity(new Intent(this, CameraSettingsActivity.class)));
+        editCamerasButton.setOnClickListener(v -> openCameraSettings());
 
         saveButton = makeButton("Save", Color.rgb(55, 115, 190));
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
@@ -148,7 +147,7 @@ public class MainActivity extends Activity {
 
         serviceButton = makeButton("START SERVICE", Color.rgb(46, 125, 50));
         serviceButton.setPadding(dp(16), serviceButton.getPaddingTop(), dp(16), serviceButton.getPaddingBottom());
-        LinearLayout.LayoutParams serviceParams = new LinearLayout.LayoutParams(-2, dp(50));
+        LinearLayout.LayoutParams serviceParams = new LinearLayout.LayoutParams(dp(220), dp(50));
         serviceParams.topMargin = dp(20);
         serviceParams.gravity = Gravity.CENTER_HORIZONTAL;
         root.addView(serviceButton, serviceParams);
@@ -291,7 +290,7 @@ public class MainActivity extends Activity {
 
     @Override public boolean onOptionsItemSelected(android.view.MenuItem item) {
         if (item.getItemId() == 1) {
-            startActivity(new Intent(this, CameraSettingsActivity.class));
+            openCameraSettings();
             return true;
         }
         if (item.getItemId() == 2) {
@@ -299,6 +298,11 @@ public class MainActivity extends Activity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void openCameraSettings() {
+        startActivity(new Intent(this, CameraSettingsActivity.class));
+        overridePendingTransition(0, 0);
     }
 
     private Button makeButton(String text, int color) {
