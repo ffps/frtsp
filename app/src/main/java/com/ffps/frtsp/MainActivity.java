@@ -28,6 +28,8 @@ import java.util.Enumeration;
 public class MainActivity extends Activity {
     private EditText password;
     private EditText port;
+    private EditText cameraCount;
+    private Button editCamerasButton;
     private Button saveButton;
     private Button serviceButton;
     private CheckBox showPassword;
@@ -102,6 +104,35 @@ public class MainActivity extends Activity {
         });
         root.addView(showPassword);
 
+
+        TextView camerasLabel = new TextView(this);
+        camerasLabel.setText("Cameras");
+        camerasLabel.setTextSize(14);
+        camerasLabel.setTextColor(Color.DKGRAY);
+        camerasLabel.setPadding(0, dp(14), 0, dp(4));
+        root.addView(camerasLabel);
+
+        LinearLayout camerasRow = new LinearLayout(this);
+        camerasRow.setOrientation(LinearLayout.HORIZONTAL);
+        camerasRow.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(camerasRow, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        cameraCount = new EditText(this);
+        cameraCount.setSingleLine(true);
+        cameraCount.setTextSize(15);
+        cameraCount.setFocusable(false);
+        cameraCount.setClickable(false);
+        cameraCount.setLongClickable(false);
+        cameraCount.setText(String.valueOf(getCameraCount()));
+        camerasRow.addView(cameraCount, new LinearLayout.LayoutParams(0, -1, 1));
+
+        editCamerasButton = makeButton("Edit", Color.rgb(55, 115, 190));
+        LinearLayout.LayoutParams editCamerasParams = new LinearLayout.LayoutParams(dp(76), dp(44));
+        editCamerasParams.leftMargin = dp(8);
+        camerasRow.addView(editCamerasButton, editCamerasParams);
+        editCamerasButton.setOnClickListener(v ->
+            startActivity(new Intent(this, CameraSettingsActivity.class)));
+
         saveButton = makeButton("Save", Color.rgb(55, 115, 190));
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
         saveParams.topMargin = dp(10);
@@ -122,6 +153,7 @@ public class MainActivity extends Activity {
         serviceParams.gravity = Gravity.CENTER_HORIZONTAL;
         root.addView(serviceButton, serviceParams);
         serviceButton.setOnClickListener(v -> {
+            if (!CameraService.isRunning() && getCameraCount() == 0) return;
             if (CameraService.isRunning()) {
                 stopService(new Intent(this, CameraService.class));
             } else {
@@ -179,6 +211,12 @@ public class MainActivity extends Activity {
     private void updateStatus() {
         boolean running = CameraService.isRunning();
         int currentPort = getSavedPort();
+        int cameras = getCameraCount();
+        cameraCount.setText(String.valueOf(cameras));
+        serviceButton.setEnabled(running || cameras > 0);
+        serviceButton.setAlpha(running || cameras > 0 ? 1.0f : 0.45f);
+        editCamerasButton.setEnabled(!running);
+        editCamerasButton.setAlpha(running ? 0.45f : 1.0f);
         if (running) {
             status.setText("Running: http://" + getDeviceIp() + ":" + currentPort);
             serviceButton.setText("STOP SERVICE");
@@ -207,6 +245,15 @@ public class MainActivity extends Activity {
 
     private int getSavedPort() {
         return getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554);
+    }
+
+    private int getCameraCount() {
+        String raw = getSharedPreferences("settings", MODE_PRIVATE).getString("cameras_json", "[]");
+        try {
+            return new org.json.JSONArray(raw).length();
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private String getDeviceIp() {
