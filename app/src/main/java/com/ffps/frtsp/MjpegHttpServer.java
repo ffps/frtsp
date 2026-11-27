@@ -21,22 +21,26 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MjpegHttpServer {
-    private static final int PORT = 8554;
     private final Context context;
+    private final int port;
     private volatile boolean running;
     private ServerSocket socket;
     private Thread acceptThread;
     private final ExecutorService clients = Executors.newCachedThreadPool();
     private final long startedAt = System.currentTimeMillis();
 
-    public MjpegHttpServer(Context context) { this.context = context.getApplicationContext(); }
+    public MjpegHttpServer(Context context) {
+        this.context = context.getApplicationContext();
+        this.port = this.context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            .getInt("http_port", 8554);
+    }
 
     public synchronized void start() {
         if (running) return;
         running = true;
         acceptThread = new Thread(() -> {
             try {
-                socket = new ServerSocket(PORT, 32, InetAddress.getByName("0.0.0.0"));
+                socket = new ServerSocket(port, 32, InetAddress.getByName("0.0.0.0"));
                 while (running) {
                     final Socket client = socket.accept();
                     clients.execute(() -> handle(client));
@@ -136,7 +140,7 @@ public class MjpegHttpServer {
 
     private JSONObject statusJson() throws JSONException {
         Runtime rt = Runtime.getRuntime();
-        JSONObject server = new JSONObject().put("running", running).put("port", PORT);
+        JSONObject server = new JSONObject().put("running", running).put("port", port);
         JSONObject memory = new JSONObject()
             .put("heap_used_mb", (rt.totalMemory() - rt.freeMemory()) / 1048576)
             .put("heap_max_mb", rt.maxMemory() / 1048576)
@@ -152,7 +156,7 @@ public class MjpegHttpServer {
     }
 
     private JSONObject configJson() throws JSONException {
-        return new JSONObject().put("http_port", PORT).put("camera_count", 0)
+        return new JSONObject().put("http_port", port).put("camera_count", 0)
             .put("api_password_configured", context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 .getString("api_password", "").length() > 0);
     }

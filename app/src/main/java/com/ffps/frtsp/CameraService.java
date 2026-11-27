@@ -25,7 +25,7 @@ public class CameraService extends Service {
             PendingIntent pending = PendingIntent.getActivity(this, 0, launch, 0);
             Notification notification = new Notification.Builder(this)
                 .setContentTitle("fRTSP")
-                .setContentText("HTTP server :8554")
+                .setContentText("HTTP server :" + getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554))
                 .setSmallIcon(android.R.drawable.presence_video_online)
                 .setContentIntent(pending)
                 .getNotification();
