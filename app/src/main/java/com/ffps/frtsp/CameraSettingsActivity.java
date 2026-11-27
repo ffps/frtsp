@@ -196,7 +196,6 @@ public class CameraSettingsActivity extends Activity {
             cameraRows.addView(row, new LinearLayout.LayoutParams(-2, dp(54)));
 
             CheckBox enabled = new CheckBox(this);
-            enabled.setButtonDrawable(android.R.drawable.btn_check);
             enabled.setGravity(Gravity.CENTER);
             enabled.setChecked(camera.enabled);
             enabled.setOnCheckedChangeListener((button, checked) -> {
