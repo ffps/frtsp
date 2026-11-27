@@ -174,11 +174,14 @@ public class MjpegHttpServer {
             try { supplied = new JSONObject(body); }
             catch (Exception e) { respond(out, 400, "Bad Request", jsonError("invalid_json")); return; }
             int oldPort = port;
+            android.content.SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
+            String oldPassword = prefs.getString("api_password", "");
             int result = runtime.updateGlobalConfig(supplied);
             if (result != 1) { respond(out, 400, "Bad Request", jsonError("invalid_config")); return; }
-            int newPort = context.getSharedPreferences("settings", Context.MODE_PRIVATE).getInt("http_port", 8554);
+            int newPort = prefs.getInt("http_port", 8554);
             boolean portChanged = newPort != oldPort;
             if (portChanged && !CameraService.prepareHttpServerSwitch(oldPort)) {
+                if (supplied.has("password")) prefs.edit().putString("api_password", oldPassword).commit();
                 respond(out, 400, "Bad Request", jsonError("port_unavailable"));
                 return;
             }
@@ -267,8 +270,8 @@ public class MjpegHttpServer {
                 .put("url", url).put("enabled", item.optBoolean("enabled", true))
                 .put("fps", item.optInt("fps", 1)).put("quality", item.optInt("quality", 75)));
         }
-        return new JSONObject().put("http_port", port).put("camera_count", source.length())
-            .put("cameras", cameras);
+        return new JSONObject().put("port", port).put("http_port", port)
+            .put("camera_count", source.length()).put("cameras", cameras);
     }
 
     private void sendSnapshot(String name, OutputStream out) throws Exception {
