@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#003399">
 <title>fRTSP</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Cdefs%3E%3ClinearGradient id='g3' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230966cc'/%3E%3Cstop offset='1' stop-color='%23030639'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='120' height='120' rx='26' fill='url(%23g3)'/%3E%3Cpath d='M60 32 L30 51 L60 70 M60 50 L90 69 L60 88' fill='none' stroke='white' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
   --a:#003399;
@@ -69,6 +70,7 @@ header{
   stroke-linejoin:round}
 .icon:hover{
   background:rgba(255,255,255,.18)}
+body.login-active main,body.login-active #toast{display:none}
 main{
   max-width:1180px;
   margin:22px auto;
@@ -111,7 +113,16 @@ main{
   object-fit:contain;
   background:#15191f}
 .caminfo{
-  padding:12px 14px}
+  padding:12px 14px;
+  cursor:pointer}
+.camera.disabled .preview{background:#15191f}
+#imageViewer{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:8px;cursor:zoom-out}
+#imageViewer.open{display:flex}
+#imageViewer img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;box-shadow:0 4px 24px #0008}
+.info-table{width:100%;border-collapse:collapse;font-size:14px}
+.info-table td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.info-table td:first-child{width:43%;color:var(--muted)}
+.info-table td:last-child{overflow-wrap:anywhere;font-weight:500}
 .camrow{
   display:flex;
   align-items:center;
@@ -171,6 +182,7 @@ dialog::backdrop{
   box-shadow:none}
 #login.login-dialog::backdrop{
   background:transparent}
+body.login-active #tools{display:none!important}
 .login-card{
   width:calc(100% - 32px);
   max-width:320px;
@@ -324,11 +336,11 @@ header{
 <button class="icon" id="settings" title="Настройки" aria-label="Настройки">
   <svg viewBox="0 0 24 24"><path fill-rule="evenodd" d="M19.39 10.23 22.15 11.04v1.92l-2.76.81-.91 2.2 1.38 2.53-1.36 1.36-2.53-1.38-2.2.91-.81 2.76h-1.92l-.81-2.76-2.2-.91-2.53 1.38-1.36-1.36 1.38-2.53-.91-2.2-2.76-.81v-1.92l2.76-.81.91-2.2L4.14 5.5 5.5 4.14l2.53 1.38 2.2-.91.81-2.76h1.92l.81 2.76 2.2.91 2.53-1.38 1.36 1.36-1.38 2.53zM15.4 12a3.4 3.4 0 1 0-6.8 0 3.4 3.4 0 0 0 6.8 0z"/></svg>
 </button>
-<button class="icon" id="refresh" title="Обновить" aria-label="Обновить">
-  <svg viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M5.5 9A7 7 0 0 1 18 6l2 2M4 16l2 2a7 7 0 0 0 12.5-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-</button>
 <button class="icon" id="info" title="Информация" aria-label="Информация">
   <svg class="line" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.6h.01"/></svg>
+</button>
+<button class="icon" id="refresh" title="Обновить" aria-label="Обновить">
+  <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0 0 4 12h2a6 6 0 0 1 10.24-4.24L13 11h7V4l-2.35 2.35zM18 12a6 6 0 0 1-10.24 4.24L11 13H4v7l2.35-2.35A7.95 7.95 0 0 0 20 12h-2z"/></svg>
 </button>
 <button class="icon" id="logout" title="Выход" aria-label="Выход">
   <svg class="line" viewBox="0 0 24 24"><path d="M10 4H5v16h5"/><path d="m16 8 4 4-4 4M9 12h11"/></svg>
@@ -339,12 +351,12 @@ header{
 <div class="heading">
 <h1>Камеры</h1>
 <span id="service" class="pill">Загрузка…</span>
-<span id="updated" class="note">
-</span>
+
 </div>
 <div id="grid" class="grid">
 </div>
 </main>
+<div id="imageViewer" aria-label="Увеличенное изображение"><img alt=""></div>
 <div id="toast">
 </div>
 <dialog id="login" class="login-dialog">
@@ -451,6 +463,7 @@ header{
     }
     function login() {
         $('loginError').hidden=true;
+        document.body.classList.add('login-active');
         $('tools').style.display='none';
         if(!$('login').open)$('login').showModal()
     }
@@ -494,6 +507,7 @@ header{
             sessionStorage.setItem('frtsp_auth', token);
             cfg=x;
             close('login');
+            document.body.classList.remove('login-active');
             $('password').value='';
             refresh()
         }).catch(function() {
@@ -505,12 +519,12 @@ header{
             login();
             return
         }
-        Promise.all([api('/api/v1/config'), api('/api/v1/status')]).then(function(v) {
+        return Promise.all([api('/api/v1/config'), api('/api/v1/status')]).then(function(v) {
             cfg=v[0];
             st=v[1];
             $('tools').style.display='flex';
             render();
-            $('updated').textContent=new Date().toLocaleTimeString()
+
         }).catch(function(e) {
             if(e.message!=='Требуется авторизация')note(e.message)
         })
@@ -533,15 +547,22 @@ header{
             var s=by[c.name]|| {
             }, card=document.createElement('article');
             card.className='camera';
-            card.onclick=function() {
-                showCamera(c.name)
-            };
+            card.className='camera'+(c.enabled?'':' disabled');
             var img=document.createElement('img');
             img.className='preview';
             img.alt=c.name;
-            img.src='/cam/'+encodeURIComponent(c.name)+'.jpg';
-            img.onerror=function() {
-                img.style.opacity='.25'
+            if(c.enabled) {
+                img.src='/cam/'+encodeURIComponent(c.name)+'.jpg';
+                img.onerror=function() { img.style.opacity='.35' };
+            } else {
+                img.removeAttribute('src');
+                img.style.opacity='1';
+            }
+            img.onclick=function(e) {
+                e.stopPropagation();
+                var viewer=$('imageViewer'), large=viewer.querySelector('img');
+                large.src='/cam/'+encodeURIComponent(c.name)+'.jpg';
+                viewer.classList.add('open');
             };
             var inf=document.createElement('div');
             inf.className='caminfo';
@@ -560,11 +581,16 @@ header{
             m.textContent=(s.source_width||0)+'×'+(s.source_height||0)+' · '+(s.output_fps||0)+' FPS · '+(s.frame_age_ms>=0?Math.round(s.frame_age_ms/1000)+' сек назад':'нет кадра');
             inf.appendChild(row);
             inf.appendChild(m);
+            inf.onclick=function() { showCamera(c.name) };
             card.appendChild(img);
             card.appendChild(inf);
             grid.appendChild(card)
         })
     }
+    $('imageViewer').onclick=function() {
+        $('imageViewer').classList.remove('open');
+        $('imageViewer').querySelector('img').removeAttribute('src');
+    };
     function showCamera(name) {
         var c=cfg.cameras.filter(function(x) {
             return x.name===name
@@ -595,9 +621,12 @@ header{
             b.onclick=function() {
                 api(path, 'POST',  {
                 }).then(function() {
-                    close('cameraDlg');
-                    note('Команда выполнена');
-                    refresh()
+                    if(path.indexOf('/off')!==-1) c.enabled=false;
+                    if(path.indexOf('/on')!==-1) c.enabled=true;
+                    return refresh().then(function() {
+                        if($('cameraDlg').open) close('cameraDlg');
+                        note('Команда выполнена');
+                    });
                 }).catch(function(e) {
                     note(e.message)
                 })
@@ -687,24 +716,38 @@ header{
         })
     };
     $('info').onclick=function() {
-        Promise.all([api('/api/v1/version'), api('/api/v1/stats')]).then(function(v) {
-            var x=v[0], s=v[1], p=document.createElement('pre');
-            p.textContent='Версия: '+x.version+'\nFFmpeg: '+x.ffmpeg+'\nВремя работы: '+(s.uptime_seconds||0)+' сек\nJPEG кадров: '+((s.totals|| {
-            }).jpeg_frames||0)+'\nПерезапуски FFmpeg: '+((s.totals|| {
-            }).ffmpeg_restarts||0)+'\nОшибки камер: '+((s.totals|| {
-            }).camera_errors||0);
-            $('infoBody').innerHTML='';
-            $('infoBody').appendChild(p);
-            var a=document.createElement('a');
-            a.href='/api';
-            a.target='_blank';
-            a.textContent='Справочник API (JSON)';
-            $('infoBody').appendChild(a);
+        Promise.all([api('/api/v1/version'), api('/api/v1/status'), api('/api/v1/stats')]).then(function(v) {
+            var x=v[0], current=v[1], s=v[2], mem=current.memory||{}, cpu=current.cpu||{}, totals=s.totals||{};
+            var rows=[
+                ['Версия',x.version||'—'],['FFmpeg',x.ffmpeg||'—'],
+                ['IP-адрес',window.location.hostname||'—'],['HTTP-порт',current.port||cfg.port||'—'],
+                ['Время работы',formatDuration(s.uptime_seconds||current.uptime_seconds||0)],
+                ['Загрузка CPU сейчас',percent(cpu.system_usage_percent)],
+                ['Средняя загрузка CPU',percent((s.cpu||{}).average_usage_percent)],
+                ['Использование RAM (heap)',mb(mem.heap_used_mb)+' / '+mb(mem.heap_max_mb)],
+                ['Native heap',mb(mem.native_heap_mb)],
+                ['Свободная системная память',mb(mem.system_available_mb)+' / '+mb(mem.system_total_mb)],
+                ['Процессов FFmpeg',current.ffmpeg_processes==null?'—':current.ffmpeg_processes],
+                ['JPEG кадров',totals.jpeg_frames||0],['Перезапуски FFmpeg',totals.ffmpeg_restarts||0],['Ошибки камер',totals.camera_errors||0]
+            ];
+            var table=document.createElement('table'); table.className='info-table';
+            rows.forEach(function(r) {
+                var tr=document.createElement('tr'), a=document.createElement('td'), b=document.createElement('td');
+                a.textContent=r[0]; b.textContent=r[1]; tr.appendChild(a); tr.appendChild(b); table.appendChild(tr);
+            });
+            $('infoBody').innerHTML=''; $('infoBody').appendChild(table);
+            var a=document.createElement('a'); a.href='/api'; a.target='_blank'; a.textContent='Справочник API (JSON)';
+            a.style.display='inline-block'; a.style.marginTop='14px'; $('infoBody').appendChild(a);
             $('infoDlg').showModal()
-        }).catch(function(e) {
-            note(e.message)
-        })
+        }).catch(function(e) { note(e.message) })
     };
+    function mb(value) { return value==null?'—':value+' MB' }
+    function percent(value) { return value==null?'—':value+'%' }
+    function formatDuration(seconds) {
+        seconds=Math.max(0,Number(seconds)||0);
+        var h=Math.floor(seconds/3600), m=Math.floor(seconds%3600/60), s=Math.floor(seconds%60);
+        return (h?h+' ч ':'')+(m?m+' мин ':'')+s+' сек';
+    }
     $('refresh').onclick=refresh;
     $('logout').onclick=function() {
         token='';
