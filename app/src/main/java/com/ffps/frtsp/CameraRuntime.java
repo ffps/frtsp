@@ -517,8 +517,8 @@ public class CameraRuntime {
 
         JSONObject toJson() throws Exception {
             long age=lastFrameAt==0?-1:System.currentTimeMillis()-lastFrameAt;
-            return new JSONObject().put("name",name).put("state",state).put("fps",fps)
-                .put("jpeg_quality",quality).put("source_width",sourceWidth).put("source_height",sourceHeight)
+            return new JSONObject().put("name",name).put("state",state)
+                .put("source_width",sourceWidth).put("source_height",sourceHeight)
                 .put("output_fps",lastFrameIntervalMs>0?Math.round(1000.0/lastFrameIntervalMs*100.0)/100.0:0)
                 .put("frame_age_ms",age).put("last_error",lastError)
                 .put("last_frame_at",lastFrameAt>0?iso8601Utc(lastFrameAt):JSONObject.NULL)
