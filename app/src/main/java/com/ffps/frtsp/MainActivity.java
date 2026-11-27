@@ -210,8 +210,8 @@ public class MainActivity extends Activity {
     private void updateHint() {
         int p = getSavedPort();
         String base = "http://" + getDeviceIp() + ":" + p;
-        hint.setText("MJPEG: " + base + "/cam/parking\n" +
-            "Snapshot: " + base + "/cam/parking.jpg\n" +
+        hint.setText("MJPEG: " + base + "/cam/{name}\n" +
+            "Snapshot: " + base + "/cam/{name}.jpg\n" +
             "API: " + base + "/api/v1/status\n" +
             "Basic Auth username: api");
     }
