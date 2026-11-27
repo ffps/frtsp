@@ -611,17 +611,20 @@ header{
                 if(!img._snapshotLoading && Date.now()-(img._snapshotAt||0)>=4500) {
                     img._snapshotLoading=true;
                     img._snapshotAt=Date.now();
+                    var generation=img._previewGeneration||0;
                     var preload=new Image();
                     preload.onload=function() {
+                        if(generation!==(img._previewGeneration||0))return;
                         img._snapshotLoading=false;
-                        if(img.isConnected && c.enabled) {
+                        if(img.isConnected && !card.classList.contains('disabled')) {
                             img.src=preload.src;
                             img.style.opacity='1';
                         }
                     };
                     preload.onerror=function() {
+                        if(generation!==(img._previewGeneration||0))return;
                         img._snapshotLoading=false;
-                        if(img.isConnected)img.style.opacity='.45';
+                        if(img.isConnected && !card.classList.contains('disabled'))img.style.opacity='.45';
                     };
                     preload.src='/cam/'+encodeURIComponent(c.name)+'.jpg?t='+Date.now();
                 }
@@ -636,6 +639,7 @@ header{
                 };
             } else {
                 img._wasDisabled=true;
+                img._previewGeneration=(img._previewGeneration||0)+1;
                 img._snapshotAt=0;
                 img._snapshotLoading=false;
                 img.removeAttribute('src');
