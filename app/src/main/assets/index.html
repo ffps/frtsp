@@ -549,76 +549,107 @@ header{
         $('service').className='pill bad';
     }
     function render() {
-        var live=st.cameras||[], by= {
-        };
-        live.forEach(function(c) {
-            by[c.name]=c
-        });
+        var live=st.cameras||[], by={}, existing={};
+        live.forEach(function(c) { by[c.name]=c });
         $('service').textContent=st.running?'Сервис работает':'Сервис остановлен';
         $('service').className='pill '+(st.running?'ok':'bad');
         var grid=$('grid');
-        grid.innerHTML='';
+        Array.prototype.forEach.call(grid.querySelectorAll('.camera[data-camera-name]'),function(card) {
+            existing[card.getAttribute('data-camera-name')]=card;
+        });
         if(!cfg.cameras.length) {
             grid.innerHTML='<div class="empty">Камер пока нет. Нажмите ＋, чтобы добавить камеру.</div>';
-            return
+            return;
         }
+        var empty=grid.querySelector('.empty');
+        if(empty)empty.remove();
         cfg.cameras.forEach(function(c) {
-            var s=by[c.name]|| {
-            }, card=document.createElement('article');
-            card.className='camera';
+            var s=by[c.name]||{}, card=existing[c.name], img, inf, row, n, p, m;
+            if(!card) {
+                card=document.createElement('article');
+                card.className='camera';
+                card.setAttribute('data-camera-name',c.name);
+                img=document.createElement('img');
+                img.className='preview';
+                img.alt=c.name;
+                img.draggable=false;
+                inf=document.createElement('div');
+                inf.className='caminfo';
+                row=document.createElement('div');
+                row.className='camrow';
+                n=document.createElement('span');
+                n.className='camname';
+                p=document.createElement('span');
+                row.appendChild(n);
+                row.appendChild(p);
+                m=document.createElement('div');
+                m.className='meta';
+                inf.appendChild(row);
+                inf.appendChild(m);
+                card.appendChild(img);
+                card.appendChild(inf);
+                grid.appendChild(card);
+            } else {
+                img=card.querySelector('.preview');
+                inf=card.querySelector('.caminfo');
+                n=inf.querySelector('.camname');
+                p=inf.querySelector('.pill');
+                m=inf.querySelector('.meta');
+            }
+            delete existing[c.name];
             card.className='camera'+(c.enabled?'':' disabled');
-            var img=document.createElement('img');
-            img.className='preview';
-            img.alt=c.name;
-            img.draggable=false;
+            n.textContent=c.name;
+            p.className='pill '+(s.state==='streaming'?'ok':(c.enabled?'bad':''));
+            p.textContent=c.enabled?(s.state||'ожидание'):'выключена';
+            m.textContent=(s.source_width||0)+'×'+(s.source_height||0)+' · '+(s.output_fps||0)+' FPS · '+(s.frame_age_ms>=0?Math.round(s.frame_age_ms/1000)+' сек назад':'нет кадра');
+            inf.onclick=function() { showCamera(c.name) };
             if(c.enabled) {
-                var snapshot='/cam/'+encodeURIComponent(c.name)+'.jpg';
-                img.src=snapshot+'?t='+Date.now();
-                img.onload=function() { img.style.opacity='1' };
-                img.onerror=function() {
-                    img.style.opacity='.35';
-                    setTimeout(function() {
-                        if(img.isConnected && c.enabled) {
-                            img.src=snapshot+'?t='+Date.now();
+                if(!img.getAttribute('src') || img._wasDisabled) {
+                    img._wasDisabled=false;
+                    img._snapshotAt=0;
+                }
+                if(!img._snapshotLoading && Date.now()-(img._snapshotAt||0)>=4500) {
+                    img._snapshotLoading=true;
+                    img._snapshotAt=Date.now();
+                    var generation=img._previewGeneration||0;
+                    var preload=new Image();
+                    preload.onload=function() {
+                        if(generation!==(img._previewGeneration||0))return;
+                        img._snapshotLoading=false;
+                        if(img.isConnected && !card.classList.contains('disabled')) {
+                            img.src=preload.src;
+                            img.style.opacity='1';
                         }
-                    }, 1500);
-                };
+                    };
+                    preload.onerror=function() {
+                        if(generation!==(img._previewGeneration||0))return;
+                        img._snapshotLoading=false;
+                        if(img.isConnected && !card.classList.contains('disabled'))img.style.opacity='.45';
+                    };
+                    preload.src='/cam/'+encodeURIComponent(c.name)+'.jpg?t='+Date.now();
+                }
                 img.onclick=function(e) {
                     e.preventDefault();
                     e.stopPropagation();
-                    if(!c.enabled) return;
+                    if(!c.enabled)return;
                     var viewer=$('imageViewer'), large=viewer.querySelector('img');
                     large.draggable=false;
-                    large.src=snapshot+'?t='+Date.now();
+                    large.src='/cam/'+encodeURIComponent(c.name);
                     viewer.classList.add('open');
                 };
             } else {
+                img._wasDisabled=true;
+                img._previewGeneration=(img._previewGeneration||0)+1;
+                img._snapshotAt=0;
+                img._snapshotLoading=false;
                 img.removeAttribute('src');
                 img.style.opacity='1';
                 img.onclick=null;
             }
-            var inf=document.createElement('div');
-            inf.className='caminfo';
-            var row=document.createElement('div');
-            row.className='camrow';
-            var n=document.createElement('span');
-            n.className='camname';
-            n.textContent=c.name;
-            var p=document.createElement('span');
-            p.className='pill '+(s.state==='streaming'?'ok':(c.enabled?'bad':''));
-            p.textContent=c.enabled?(s.state||'ожидание'):'выключена';
-            row.appendChild(n);
-            row.appendChild(p);
-            var m=document.createElement('div');
-            m.className='meta';
-            m.textContent=(s.source_width||0)+'×'+(s.source_height||0)+' · '+(s.output_fps||0)+' FPS · '+(s.frame_age_ms>=0?Math.round(s.frame_age_ms/1000)+' сек назад':'нет кадра');
-            inf.appendChild(row);
-            inf.appendChild(m);
-            inf.onclick=function() { showCamera(c.name) };
-            card.appendChild(img);
-            card.appendChild(inf);
-            grid.appendChild(card)
-        })
+        });
+        Object.keys(existing).forEach(function(name) {
+            existing[name].remove();
+        });
     }
     $('imageViewer').onclick=function() {
         $('imageViewer').classList.remove('open');
