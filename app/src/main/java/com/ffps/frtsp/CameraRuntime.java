@@ -107,17 +107,46 @@ public class CameraRuntime {
 
     public synchronized boolean setCameraEnabled(String name, boolean enabled) {
         if (!running) return false;
-        JSONObject item = findConfig(name);
+
+        JSONArray cameras = readConfig();
+        JSONObject item = null;
+        int index = -1;
+        for (int i = 0; i < cameras.length(); i++) {
+            JSONObject candidate = cameras.optJSONObject(i);
+            if (candidate != null && name.equals(candidate.optString("name"))) {
+                item = candidate;
+                index = i;
+                break;
+            }
+        }
         if (item == null) return false;
+
+        if (item.optBoolean("enabled", true) != enabled) {
+            try {
+                item.put("enabled", enabled);
+                cameras.put(index, item);
+                if (!context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
+                    .putString("cameras_json", cameras.toString()).commit()) {
+                    addLog("ERROR", "Cannot save camera enabled state: " + name);
+                    return false;
+                }
+            } catch (Exception e) {
+                addLog("ERROR", "Cannot update camera enabled state: " + name + ": " + e.getMessage());
+                return false;
+            }
+        }
+
         CameraWorker current = workers.get(name);
         if (enabled) {
-            if (current != null) return true;
-            CameraWorker worker = new CameraWorker(item);
-            workers.put(name, worker);
-            worker.start();
-            addLog("INFO", "Camera enabled: " + name);
+            if (current == null) {
+                CameraWorker worker = new CameraWorker(item);
+                workers.put(name, worker);
+                worker.start();
+                addLog("INFO", "Camera enabled: " + name);
+            }
             return true;
         }
+
         if (current != null) {
             workers.remove(name);
             current.stop();
