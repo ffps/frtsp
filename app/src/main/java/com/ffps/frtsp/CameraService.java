@@ -138,7 +138,11 @@ public class CameraService extends Service {
 
     private File installFfmpeg() throws Exception {
         File target = new File(getFilesDir(), "ffmpeg");
-        if (target.exists() && target.length() > 0 && target.canExecute()) return target;
+        long apkUpdateTime = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
+        android.content.SharedPreferences prefs = getSharedPreferences("ffmpeg_binary", MODE_PRIVATE);
+        if (target.exists() && target.length() > 0 && target.canExecute() &&
+            prefs.getLong("apk_update_time", 0) == apkUpdateTime) return target;
+
         InputStream input = null;
         FileOutputStream output = null;
         try {
@@ -147,6 +151,7 @@ public class CameraService extends Service {
             byte[] buffer = new byte[16384];
             int count;
             while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.flush();
             output.getFD().sync();
         } finally {
             if (input != null) try { input.close(); } catch (Exception ignored) { }
@@ -156,6 +161,9 @@ public class CameraService extends Service {
             throw new Exception("Cannot set FFmpeg permissions");
         if (!target.exists() || target.length() == 0 || !target.canExecute())
             throw new Exception("FFmpeg installation failed");
+
+        if (!prefs.edit().putLong("apk_update_time", apkUpdateTime).commit())
+            throw new Exception("Cannot save FFmpeg version");
         return target;
     }
 
