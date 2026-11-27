@@ -160,10 +160,8 @@ public class CameraRuntime {
 
     public JSONObject statsJson() {
         try {
-            long errors = 0;
             JSONArray cameras = new JSONArray();
             for (CameraWorker worker : workers.values()) {
-                errors += worker.counters.errors.get();
                 cameras.put(new JSONObject().put("name", worker.name).put("frames", worker.counters.frames.get())
                     .put("restarts", worker.restartCount).put("errors", worker.counters.errors.get())
                     .put("state", worker.state));
@@ -357,7 +355,8 @@ public class CameraRuntime {
                     addLog("WARN",name+": "+lastError+" (exit "+exit+")");
                 } catch(Exception e) {
                     if (!wanted || !running) break;
-                    errorCount++;
+                    counters.errors.incrementAndGet();
+                    totalErrors.incrementAndGet();
                     lastErrorAt=System.currentTimeMillis();
                     lastError=redact(e.getMessage()==null?e.toString():e.getMessage());
                     addLog("ERROR",name+": "+lastError);
