@@ -30,7 +30,6 @@ public class MainActivity extends Activity {
     private EditText port;
     private Button saveButton;
     private Button serviceButton;
-    private Button cameraSettingsButton;
     private CheckBox showPassword;
     private TextView status;
     private TextView hint;
@@ -57,14 +56,20 @@ public class MainActivity extends Activity {
         status.setEllipsize(TextUtils.TruncateAt.END);
         status.setGravity(Gravity.CENTER_VERTICAL);
         status.setPadding(dp(8), 0, dp(8), 0);
-        root.addView(status, new LinearLayout.LayoutParams(-1, dp(44)));
+        root.addView(status, new LinearLayout.LayoutParams(-1, dp(38)));
 
-        cameraSettingsButton = makeButton("CAMERAS", Color.rgb(70, 110, 160));
-        LinearLayout.LayoutParams camerasParams = new LinearLayout.LayoutParams(-2, dp(44));
-        camerasParams.topMargin = dp(6);
-        camerasParams.gravity = Gravity.LEFT;
-        root.addView(cameraSettingsButton, camerasParams);
-        cameraSettingsButton.setOnClickListener(v ->
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(0, dp(4), 0, dp(8));
+        root.addView(tabs, new LinearLayout.LayoutParams(-1, dp(48)));
+        Button settingsTab = makeButton("SETTINGS", Color.rgb(55, 115, 190));
+        tabs.addView(settingsTab, new LinearLayout.LayoutParams(0, -1, 1));
+        Button camerasTab = makeButton("CAMERAS", Color.rgb(115, 125, 135));
+        LinearLayout.LayoutParams camerasTabParams = new LinearLayout.LayoutParams(0, -1, 1);
+        camerasTabParams.leftMargin = dp(6);
+        tabs.addView(camerasTab, camerasTabParams);
+        settingsTab.setEnabled(false);
+        camerasTab.setOnClickListener(v ->
             startActivity(new Intent(this, CameraSettingsActivity.class)));
 
         TextView portLabel = new TextView(this);
@@ -199,8 +204,6 @@ public class MainActivity extends Activity {
         port.setEnabled(!running);
         showPassword.setEnabled(!running);
         saveButton.setEnabled(!running);
-        cameraSettingsButton.setEnabled(!running);
-        cameraSettingsButton.setAlpha(running ? 0.45f : 1.0f);
         saveButton.setAlpha(running ? 0.45f : 1.0f);
     }
 
