@@ -1,4 +1,4 @@
-# fRTSP — конвертер RTSP → MJPEG для Android
+# <p align="center"><img src="assets/icon.svg" /><br />fRTSP — конвертер RTSP > MJPEG для Android</p>
 
 Приложение предназначено для преобразования видеопотоков RTSP с IP-камер в MJPEG по HTTP. Целевая платформа — старые Android-устройства, в том числе Android 4.2.1 (API 17).
 
