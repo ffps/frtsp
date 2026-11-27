@@ -74,14 +74,8 @@ public class CameraService extends Service {
                     service.getSharedPreferences("settings", MODE_PRIVATE).getInt("http_port", 8554));
             } catch (Exception e) {
                 service.getSharedPreferences("settings", MODE_PRIVATE).edit().putInt("http_port", oldPort).commit();
+                service.server = oldServer;
                 android.util.Log.e("fRTSP", "Cannot switch HTTP port; keeping " + oldPort, e);
-                try {
-                    if (service.server != null && service.server != oldServer) service.server.stop();
-                    service.server = new MjpegHttpServer(service);
-                    service.server.start();
-                } catch (Exception restoreError) {
-                    android.util.Log.e("fRTSP", "Cannot restore HTTP server on port " + oldPort, restoreError);
-                }
             }
         }
     }
