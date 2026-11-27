@@ -624,7 +624,10 @@ header{
                     if(path.indexOf('/off')!==-1) c.enabled=false;
                     if(path.indexOf('/on')!==-1) c.enabled=true;
                     return refresh().then(function() {
-                        if($('cameraDlg').open) close('cameraDlg');
+                        if($('cameraDlg').open) {
+                            close('cameraDlg');
+                            showCamera(name);
+                        }
                         note('Команда выполнена');
                     });
                 }).catch(function(e) {
