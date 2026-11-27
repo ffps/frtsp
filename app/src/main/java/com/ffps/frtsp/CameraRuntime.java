@@ -218,12 +218,13 @@ public class CameraRuntime {
     public JSONObject statsJson() {
         try {
             JSONArray cameras = new JSONArray();
-            for (CameraWorker worker : workers.values()) {
-                CameraCounters c = worker.counters;
+            for (Map.Entry<String, CameraCounters> entry : cameraCounters.entrySet()) {
+                String cameraName = entry.getKey();
+                CameraCounters c = entry.getValue();
                 long intervals = c.intervalCount.get();
                 long minInterval = c.minIntervalMs.get();
                 long maxInterval = c.maxIntervalMs.get();
-                JSONObject item = new JSONObject().put("name", worker.name)
+                JSONObject item = new JSONObject().put("name", cameraName)
                     .put("frames", c.frames.get()).put("restarts", c.restarts.get())
                     .put("errors", c.errors.get())
                     .put("average_output_fps", intervals > 0 ? round2(1000.0 * intervals / c.intervalSumMs.get()) : JSONObject.NULL)
@@ -438,7 +439,13 @@ public class CameraRuntime {
                     readJpegs(new BufferedInputStream(current.getInputStream(), 65536));
                     if (!wanted || !running) break;
                     int exit=current.waitFor();
-                    if (restartRequested) { restartRequested=false; continue; }
+                    if (restartRequested) {
+                        restartRequested=false;
+                        restartCount++;
+                        counters.restarts.incrementAndGet();
+                        totalRestarts.incrementAndGet();
+                        continue;
+                    }
                     counters.errors.incrementAndGet();
                     totalErrors.incrementAndGet();
                     lastErrorAt=System.currentTimeMillis();
