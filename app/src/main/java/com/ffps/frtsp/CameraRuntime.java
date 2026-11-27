@@ -191,13 +191,19 @@ public class CameraRuntime {
                 merged.put("enabled", supplied.getBoolean("enabled"));
             }
             if (supplied.has("fps")) {
-                int fps = supplied.getInt("fps");
-                if (fps < 1 || fps > 60) return -2;
+                Object value = supplied.opt("fps");
+                if (!(value instanceof Number)) return -2;
+                double numeric = ((Number) value).doubleValue();
+                int fps = (int) numeric;
+                if (numeric != fps || fps < 1 || fps > 60) return -2;
                 merged.put("fps", fps);
             }
             if (supplied.has("quality")) {
-                int quality = supplied.getInt("quality");
-                if (quality < 1 || quality > 100) return -2;
+                Object value = supplied.opt("quality");
+                if (!(value instanceof Number)) return -2;
+                double numeric = ((Number) value).doubleValue();
+                int quality = (int) numeric;
+                if (numeric != quality || quality < 1 || quality > 100) return -2;
                 merged.put("quality", quality);
             }
             if (merged.optString("url", "").length() == 0) return -2;
@@ -249,8 +255,11 @@ public class CameraRuntime {
         android.content.SharedPreferences.Editor editor = prefs.edit();
         try {
             if (supplied.has("port")) {
-                int port = supplied.getInt("port");
-                if (port < 1 || port > 65535) return -2;
+                Object value = supplied.opt("port");
+                if (!(value instanceof Number)) return -2;
+                double numeric = ((Number) value).doubleValue();
+                int port = (int) numeric;
+                if (numeric != port || port < 1 || port > 65535) return -2;
                 editor.putInt("http_port", port);
             }
             if (supplied.has("password")) {
