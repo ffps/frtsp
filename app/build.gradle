@@ -2,10 +2,12 @@ plugins {
     id 'com.android.application'
 }
 
-def tagVersion = System.getenv("GITHUB_REF_NAME") ?: "v0.1.0"
-def cleanVersion = tagVersion.replaceFirst("^v", "")
+def refName = System.getenv("GITHUB_REF_NAME") ?: "v0.1.0"
+def cleanVersion = refName.replaceFirst("^v", "")
+if (!(cleanVersion ==~ /\\d+\\.\\d+\\.\\d+/)) {
+    cleanVersion = "0.1.0"
+}
 def parts = cleanVersion.tokenize(".").collect { it.toInteger() }
-while (parts.size() < 3) parts << 0
 def versionCodeValue = parts[0] * 1000000 + parts[1] * 1000 + parts[2]
 if (versionCodeValue > 2100000000) throw new GradleException("versionCode is too large")
 
