@@ -8,6 +8,8 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -83,7 +85,7 @@ public class MjpegHttpServer {
                 }
             }
 
-            if (path.startsWith("/api/")) {
+            if ("/api".equals(path) || path.startsWith("/api/")) {
                 if (!isLocal(c.getInetAddress()) && !authorized(auth)) {
                     out.write(("HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"fRTSP API\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
                     return;
@@ -110,8 +112,7 @@ public class MjpegHttpServer {
                 return;
             }
             if ("/".equals(path) && "GET".equals(method)) {
-                respond(out, 200, "OK", new JSONObject().put("name", "fRTSP")
-                    .put("api", "/api/v1/").put("status", "/api/v1/status"));
+                sendAdminPage(out);
                 return;
             }
             respond(out, 404, "Not Found", jsonError("not_found"));
@@ -134,7 +135,29 @@ public class MjpegHttpServer {
     private void handleApi(String method, String path, String body, OutputStream out) throws Exception {
         CameraRuntime runtime = CameraService.getRuntime();
         if ("GET".equals(method)) {
-            if ("/api/v1/status".equals(path)) {
+            if ("/api".equals(path)) {
+                JSONObject methods = new JSONObject();
+                methods.put("GET /api/v1/status", "Текущее состояние сервера, ресурсов и камер");
+                methods.put("GET /api/v1/stats", "Накопительная статистика с момента запуска сервиса");
+                methods.put("GET /api/v1/config", "Общие настройки и список камер");
+                methods.put("POST /api/v1/config", "Изменить порт HTTP и/или пароль API");
+                methods.put("GET /api/v1/version", "Версия приложения и сведения о FFmpeg");
+                methods.put("GET /api/v1/logs", "Последние диагностические сообщения");
+                methods.put("GET /api/v1/camera/{name}/config", "Получить настройки камеры");
+                methods.put("POST /api/v1/camera/{name}/config", "Изменить настройки камеры");
+                methods.put("PUT /api/v1/camera/{name}", "Добавить камеру");
+                methods.put("DELETE /api/v1/camera/{name}", "Удалить камеру");
+                methods.put("POST /api/v1/camera/{name}/start", "Запустить камеру");
+                methods.put("POST /api/v1/camera/{name}/stop", "Остановить процесс камеры");
+                methods.put("POST /api/v1/camera/{name}/on", "Включить камеру");
+                methods.put("POST /api/v1/camera/{name}/off", "Выключить камеру");
+                methods.put("POST /api/v1/camera/{name}/restart", "Перезапустить камеру");
+                methods.put("POST /api/v1/cameras/restart", "Перезапустить все камеры");
+                methods.put("POST /api/v1/service/restart", "Перезапустить процессы камер");
+                methods.put("GET /cam/{name}.jpg", "Последний JPEG-кадр камеры");
+                methods.put("GET /cam/{name}", "Непрерывный MJPEG-поток камеры");
+                respond(out, 200, "OK", methods);
+            } else if ("/api/v1/status".equals(path)) {
                 respond(out, 200, "OK", runtime == null ? new JSONObject().put("running", false) : runtime.statusJson(port));
             } else if ("/api/v1/version".equals(path)) {
                 respond(out, 200, "OK", runtime == null ? new JSONObject().put("app", "fRTSP")
@@ -272,6 +295,23 @@ public class MjpegHttpServer {
         }
         return new JSONObject().put("port", port).put("http_port", port)
             .put("camera_count", source.length()).put("cameras", cameras);
+    }
+
+    private void sendAdminPage(OutputStream out) throws Exception {
+        File page = new File(context.getFilesDir(), "index.html");
+        if (!page.isFile()) { respond(out, 404, "Not Found", jsonError("admin_page_not_found")); return; }
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (FileInputStream input = new FileInputStream(page)) {
+            byte[] chunk = new byte[8192];
+            int count;
+            while ((count = input.read(chunk)) != -1) buffer.write(chunk, 0, count);
+        }
+        byte[] data = buffer.toByteArray();
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n" +
+            "Content-Length: " + data.length + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n")
+            .getBytes("ISO-8859-1"));
+        out.write(data);
+        out.flush();
     }
 
     private void sendSnapshot(String name, OutputStream out) throws Exception {

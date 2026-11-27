@@ -32,6 +32,7 @@ public class CameraService extends Service {
         super.onCreate();
         instance = this;
         try {
+            installAdminPage();
             File ffmpeg = installFfmpeg();
             Intent launch = new Intent(this, MainActivity.class);
             PendingIntent pending = PendingIntent.getActivity(this, 0, launch, 0);
@@ -111,6 +112,25 @@ public class CameraService extends Service {
             if (ip != 0) return Formatter.formatIpAddress(ip);
         } catch (Exception ignored) { }
         return "DEVICE_IP";
+    }
+
+    private void installAdminPage() throws Exception {
+        File target = new File(getFilesDir(), "index.html");
+        if (target.exists()) return;
+        InputStream input = null;
+        FileOutputStream output = null;
+        try {
+            input = getAssets().open("index.html");
+            output = new FileOutputStream(target, false);
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            output.flush();
+            output.getFD().sync();
+        } finally {
+            if (input != null) try { input.close(); } catch (Exception ignored) { }
+            if (output != null) try { output.close(); } catch (Exception ignored) { }
+        }
     }
 
     private File installFfmpeg() throws Exception {
