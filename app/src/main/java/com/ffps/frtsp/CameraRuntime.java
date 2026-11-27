@@ -183,6 +183,7 @@ public class CameraRuntime {
                     int newAt = url.indexOf('@');
                     if (oldAt > 0 && newAt > 0) url = oldUrl.substring(0, oldAt) + url.substring(newAt);
                 }
+                if (!url.matches("(?i)^rtsp://[^/]+.*")) return -2;
                 merged.put("url", url);
             }
             if (supplied.has("enabled")) {
@@ -203,6 +204,7 @@ public class CameraRuntime {
             if (index >= 0) source.put(index, merged); else source.put(merged);
             context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit()
                 .putString("cameras_json", source.toString()).commit();
+            countersFor(name);
 
             CameraWorker current = workers.remove(name);
             if (current != null) current.stop();
@@ -240,7 +242,7 @@ public class CameraRuntime {
         return 1;
     }
 
-    // Validates and stores only fields supplied. portChanged is set by the HTTP layer after success.
+    // Validates and stores only the fields supplied by the caller.
     public synchronized int updateGlobalConfig(JSONObject supplied) {
         if (!running || supplied == null) return -2;
         android.content.SharedPreferences prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
