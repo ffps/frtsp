@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     private EditText port;
     private Button saveButton;
     private Button serviceButton;
+    private Button cameraSettingsButton;
     private CheckBox showPassword;
     private TextView status;
     private TextView hint;
@@ -57,6 +58,14 @@ public class MainActivity extends Activity {
         status.setGravity(Gravity.CENTER_VERTICAL);
         status.setPadding(dp(8), 0, dp(8), 0);
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        cameraSettingsButton = makeButton("CAMERAS", Color.rgb(70, 110, 160));
+        LinearLayout.LayoutParams camerasParams = new LinearLayout.LayoutParams(-2, dp(44));
+        camerasParams.topMargin = dp(6);
+        camerasParams.gravity = Gravity.LEFT;
+        root.addView(cameraSettingsButton, camerasParams);
+        cameraSettingsButton.setOnClickListener(v ->
+            startActivity(new Intent(this, CameraSettingsActivity.class)));
 
         TextView portLabel = new TextView(this);
         portLabel.setText("Port");
@@ -190,14 +199,16 @@ public class MainActivity extends Activity {
         port.setEnabled(!running);
         showPassword.setEnabled(!running);
         saveButton.setEnabled(!running);
+        cameraSettingsButton.setEnabled(!running);
+        cameraSettingsButton.setAlpha(running ? 0.45f : 1.0f);
         saveButton.setAlpha(running ? 0.45f : 1.0f);
     }
 
     private void updateHint() {
         int p = getSavedPort();
         String base = "http://" + getDeviceIp() + ":" + p;
-        hint.setText("MJPEG: " + base + "/camera/1\n" +
-            "Snapshot: " + base + "/camera/1.jpg\n" +
+        hint.setText("MJPEG: " + base + "/cam/parking\n" +
+            "Snapshot: " + base + "/cam/parking.jpg\n" +
             "API: " + base + "/api/v1/status\n" +
             "Basic Auth username: api");
     }
