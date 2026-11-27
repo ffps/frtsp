@@ -73,6 +73,13 @@ public class MainActivity extends Activity {
         password.setText(getSharedPreferences("settings", MODE_PRIVATE).getString("api_password", ""));
         root.addView(password, new LinearLayout.LayoutParams(-1, dp(48)));
 
+        saveButton = makeButton("Save", Color.rgb(55, 115, 190));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
+        saveParams.topMargin = dp(10);
+        saveParams.gravity = Gravity.LEFT;
+        root.addView(saveButton, saveParams);
+        saveButton.setOnClickListener(v -> saveSettings());
+
         showPassword = new CheckBox(this);
         showPassword.setText("Show password");
         showPassword.setTextColor(Color.DKGRAY);
@@ -99,13 +106,6 @@ public class MainActivity extends Activity {
         port.setInputType(InputType.TYPE_CLASS_NUMBER);
         port.setText(String.valueOf(getSavedPort()));
         root.addView(port, new LinearLayout.LayoutParams(-1, dp(48)));
-
-        saveButton = makeButton("Save", Color.rgb(55, 115, 190));
-        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
-        saveParams.topMargin = dp(10);
-        saveParams.gravity = Gravity.LEFT;
-        root.addView(saveButton, saveParams);
-        saveButton.setOnClickListener(v -> saveSettings());
 
         hint = new TextView(this);
         hint.setTextSize(13);
