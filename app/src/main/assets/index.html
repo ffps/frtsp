@@ -104,7 +104,6 @@ main{
   border:1px solid var(--line);
   border-radius:11px;
   overflow:hidden;
-  cursor:pointer;
   box-shadow:0 2px 8px #172b4d0c}
 .preview{
   display:block;
@@ -118,7 +117,7 @@ main{
 .camera.disabled .preview{background:#15191f}
 #imageViewer{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;padding:8px;cursor:zoom-out}
 #imageViewer.open{display:flex}
-#imageViewer img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;box-shadow:0 4px 24px #0008}
+#imageViewer img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;box-shadow:0 4px 24px #0008;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
 .info-table{width:100%;border-collapse:collapse;font-size:14px}
 .info-table td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 .info-table td:first-child{width:43%;color:var(--muted)}
@@ -500,6 +499,15 @@ header{
             close(b.getAttribute('data-close'))
         }
     });
+    document.querySelectorAll('dialog:not(#login)').forEach(function(dlg) {
+        dlg.addEventListener('click', function(e) {
+            if(e.target!==dlg) return;
+            var r=dlg.getBoundingClientRect();
+            if(e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom) {
+                dlg.close();
+            }
+        });
+    });
     $('loginForm').onsubmit=function(e) {
         e.preventDefault();
         token=btoa(unescape(encodeURIComponent('api:'+ $('password').value)));
@@ -526,8 +534,19 @@ header{
             render();
 
         }).catch(function(e) {
-            if(e.message!=='Требуется авторизация')note(e.message)
+            if(isNetworkError(e)) {
+                showConnectionLost();
+            } else if(e.message!=='Требуется авторизация') {
+                note(e.message)
+            }
         })
+    }
+    function isNetworkError(e) {
+        return e instanceof TypeError || /NetworkError|Failed to fetch|Load failed/i.test(e.message||'');
+    }
+    function showConnectionLost() {
+        $('service').textContent='Нет связи с сервисом';
+        $('service').className='pill bad';
     }
     function render() {
         var live=st.cameras||[], by= {
@@ -551,19 +570,33 @@ header{
             var img=document.createElement('img');
             img.className='preview';
             img.alt=c.name;
+            img.draggable=false;
             if(c.enabled) {
-                img.src='/cam/'+encodeURIComponent(c.name)+'.jpg';
-                img.onerror=function() { img.style.opacity='.35' };
+                var snapshot='/cam/'+encodeURIComponent(c.name)+'.jpg';
+                img.src=snapshot+'?t='+Date.now();
+                img.onload=function() { img.style.opacity='1' };
+                img.onerror=function() {
+                    img.style.opacity='.35';
+                    setTimeout(function() {
+                        if(img.isConnected && c.enabled) {
+                            img.src=snapshot+'?t='+Date.now();
+                        }
+                    }, 1500);
+                };
+                img.onclick=function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if(!c.enabled) return;
+                    var viewer=$('imageViewer'), large=viewer.querySelector('img');
+                    large.draggable=false;
+                    large.src=snapshot+'?t='+Date.now();
+                    viewer.classList.add('open');
+                };
             } else {
                 img.removeAttribute('src');
                 img.style.opacity='1';
+                img.onclick=null;
             }
-            img.onclick=function(e) {
-                e.stopPropagation();
-                var viewer=$('imageViewer'), large=viewer.querySelector('img');
-                large.src='/cam/'+encodeURIComponent(c.name)+'.jpg';
-                viewer.classList.add('open');
-            };
             var inf=document.createElement('div');
             inf.className='caminfo';
             var row=document.createElement('div');
@@ -590,6 +623,13 @@ header{
     $('imageViewer').onclick=function() {
         $('imageViewer').classList.remove('open');
         $('imageViewer').querySelector('img').removeAttribute('src');
+    };
+    $('imageViewer').querySelector('img').ondragstart=function(e) {
+        e.preventDefault();
+        return false;
+    };
+    $('imageViewer').querySelector('img').onmousedown=function(e) {
+        e.preventDefault();
     };
     function showCamera(name) {
         var c=cfg.cameras.filter(function(x) {
@@ -760,7 +800,10 @@ header{
     if(token)api('/api/v1/config').then(function(x) {
         cfg=x;
         refresh()
-    }).catch(login);
+    }).catch(function(e) {
+        if(isNetworkError(e)) showConnectionLost();
+        else if(e.message!=='Требуется авторизация') login();
+    });
     else login();
     setInterval(function() {
         if(token)refresh()
