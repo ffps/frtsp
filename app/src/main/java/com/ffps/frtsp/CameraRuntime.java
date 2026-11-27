@@ -29,9 +29,11 @@ public class CameraRuntime {
     private final Context context;
     private final File ffmpeg;
     private final Map<String, CameraWorker> workers = new ConcurrentHashMap<String, CameraWorker>();
+    private final Map<String, CameraCounters> cameraCounters = new ConcurrentHashMap<String, CameraCounters>();
     private final ArrayDeque<String> logBuffer = new ArrayDeque<String>();
     private final AtomicLong totalFrames = new AtomicLong();
     private final AtomicLong totalRestarts = new AtomicLong();
+    private final AtomicLong totalErrors = new AtomicLong();
     private final long startedAt = System.currentTimeMillis();
     private volatile boolean running;
     private long cpuTotalPrevious = -1;
@@ -161,14 +163,14 @@ public class CameraRuntime {
             long errors = 0;
             JSONArray cameras = new JSONArray();
             for (CameraWorker worker : workers.values()) {
-                errors += worker.errorCount;
-                cameras.put(new JSONObject().put("name", worker.name).put("frames", worker.frames.get())
-                    .put("restarts", worker.restartCount).put("errors", worker.errorCount)
+                errors += worker.counters.errors.get();
+                cameras.put(new JSONObject().put("name", worker.name).put("frames", worker.counters.frames.get())
+                    .put("restarts", worker.restartCount).put("errors", worker.counters.errors.get())
                     .put("state", worker.state));
             }
             return new JSONObject().put("uptime_seconds", (System.currentTimeMillis()-startedAt)/1000)
                 .put("ffmpeg_processes", activeProcesses()).put("jpeg_frames_total", totalFrames.get())
-                .put("ffmpeg_restarts_total", totalRestarts.get()).put("camera_errors_total", errors)
+                .put("ffmpeg_restarts_total", totalRestarts.get()).put("camera_errors_total", totalErrors.get())
                 .put("cameras", cameras);
         } catch (Exception e) { return new JSONObject(); }
     }
@@ -238,6 +240,20 @@ public class CameraRuntime {
         return value.replaceAll("(?i)(rtsp://[^:/@]+):[^@/]*@", "$1:***@");
     }
 
+    private static class CameraCounters {
+        final AtomicLong frames = new AtomicLong();
+        final AtomicLong errors = new AtomicLong();
+    }
+
+    private synchronized CameraCounters countersFor(String name) {
+        CameraCounters counters = cameraCounters.get(name);
+        if (counters == null) {
+            counters = new CameraCounters();
+            cameraCounters.put(name, counters);
+        }
+        return counters;
+    }
+
     public class CameraWorker {
         public final String name;
         private final String url;
@@ -252,17 +268,17 @@ public class CameraRuntime {
         private volatile long lastFrameAt;
         private volatile long lastFrameIntervalMs;
         private volatile int restartCount;
-        private volatile int errorCount;
+        private final CameraCounters counters;
         private volatile long lastErrorAt;
         private volatile int sourceWidth;
         private volatile int sourceHeight;
         private volatile long frameSequence;
         private volatile Thread workerThread;
-        private final AtomicLong frames = new AtomicLong();
         private final Object frameLock = new Object();
 
         CameraWorker(JSONObject config) {
             name=config.optString("name","");
+            counters=countersFor(name);
             url=config.optString("url","");
             fps=Math.max(1,Math.min(60,config.optInt("fps",1)));
             quality=Math.max(1,Math.min(100,config.optInt("quality",75)));
@@ -334,7 +350,8 @@ public class CameraRuntime {
                     if (!wanted || !running) break;
                     int exit=current.waitFor();
                     if (restartRequested) { restartRequested=false; continue; }
-                    errorCount++;
+                    counters.errors.incrementAndGet();
+                    totalErrors.incrementAndGet();
                     lastErrorAt=System.currentTimeMillis();
                     if (lastError.length() == 0) lastError="FFmpeg exited with code "+exit;
                     addLog("WARN",name+": "+lastError+" (exit "+exit+")");
@@ -392,7 +409,7 @@ public class CameraRuntime {
                         long now=System.currentTimeMillis();
                         if(lastFrameAt>0) lastFrameIntervalMs=now-lastFrameAt;
                         lastFrameAt=now;
-                        frameSequence++; frames.incrementAndGet(); totalFrames.incrementAndGet();
+                        frameSequence++; counters.frames.incrementAndGet(); totalFrames.incrementAndGet();
                         state="streaming";
                         synchronized(frameLock) { frameLock.notifyAll(); }
                         frame=null;
@@ -407,8 +424,8 @@ public class CameraRuntime {
             return new JSONObject().put("name",name).put("state",state).put("fps",fps)
                 .put("jpeg_quality",quality).put("source_width",sourceWidth).put("source_height",sourceHeight)
                 .put("output_fps",lastFrameIntervalMs>0?Math.round(1000.0/lastFrameIntervalMs*100.0)/100.0:0)
-                .put("frames_total",frames.get()).put("frame_age_ms",age).put("restarts",restartCount)
-                .put("errors",errorCount).put("last_error",lastError)
+                .put("frames_total",counters.frames.get()).put("frame_age_ms",age).put("restarts",restartCount)
+                .put("errors",counters.errors.get()).put("last_error",lastError)
                 .put("last_frame_at",lastFrameAt>0?iso8601Utc(lastFrameAt):JSONObject.NULL)
                 .put("last_error_at",lastErrorAt>0?iso8601Utc(lastErrorAt):JSONObject.NULL);
         }
