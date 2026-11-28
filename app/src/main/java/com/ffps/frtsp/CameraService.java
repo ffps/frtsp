@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.os.Build;
 import android.net.wifi.WifiManager;
 import android.text.format.Formatter;
 
@@ -22,6 +23,7 @@ public class CameraService extends Service {
     private static volatile CameraRuntime runtime;
     private static volatile CameraService instance;
     private MjpegHttpServer server;
+    private String ffmpegAbi;
     private MjpegHttpServer pendingOldServer;
 
     public static boolean isRunning() { return running; }
@@ -46,7 +48,7 @@ public class CameraService extends Service {
                 .getNotification();
             startForeground(1, notification);
 
-            runtime = new CameraRuntime(this, ffmpeg);
+            runtime = new CameraRuntime(this, ffmpeg, ffmpegAbi);
             runtime.start();
             server = new MjpegHttpServer(this);
             server.start();
@@ -136,17 +138,35 @@ public class CameraService extends Service {
         }
     }
 
+    private String detectFfmpegAbi() throws Exception {
+        if (Build.VERSION.SDK_INT >= 23) {
+            return android.os.Process.is64Bit() ? "arm64-v8a" : "armeabi-v7a";
+        }
+        if (Build.VERSION.SDK_INT >= 21) {
+            for (String abi : Build.SUPPORTED_ABIS) {
+                if ("arm64-v8a".equals(abi) || "armeabi-v7a".equals(abi)) return abi;
+            }
+        } else {
+            String abi = Build.CPU_ABI;
+            if ("armeabi-v7a".equals(abi) || "armeabi".equals(abi)) return "armeabi-v7a";
+        }
+        throw new Exception("Unsupported device ABI: " + Build.CPU_ABI);
+    }
+
     private File installFfmpeg() throws Exception {
+        ffmpegAbi = detectFfmpegAbi();
+        String assetPath = "ffmpeg-" + ("arm64-v8a".equals(ffmpegAbi) ? "arm64" : "armv7") + "/ffmpeg";
         File target = new File(getFilesDir(), "ffmpeg");
         long apkUpdateTime = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
         android.content.SharedPreferences prefs = getSharedPreferences("ffmpeg_binary", MODE_PRIVATE);
         if (target.exists() && target.length() > 0 && target.canExecute() &&
-            prefs.getLong("apk_update_time", 0) == apkUpdateTime) return target;
+            prefs.getLong("apk_update_time", 0) == apkUpdateTime &&
+            ffmpegAbi.equals(prefs.getString("abi", ""))) return target;
 
         InputStream input = null;
         FileOutputStream output = null;
         try {
-            input = getAssets().open("ffmpeg-armv7/ffmpeg");
+            input = getAssets().open(assetPath);
             output = new FileOutputStream(target, false);
             byte[] buffer = new byte[16384];
             int count;
@@ -162,7 +182,7 @@ public class CameraService extends Service {
         if (!target.exists() || target.length() == 0 || !target.canExecute())
             throw new Exception("FFmpeg installation failed");
 
-        if (!prefs.edit().putLong("apk_update_time", apkUpdateTime).commit())
+        if (!prefs.edit().putLong("apk_update_time", apkUpdateTime).putString("abi", ffmpegAbi).commit())
             throw new Exception("Cannot save FFmpeg version");
         return target;
     }
