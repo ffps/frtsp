@@ -43,6 +43,11 @@ public class CameraRuntime {
     private volatile long latestCpuSampleAt;
     private long cpuUsageSamples;
     private double cpuUsageSum;
+    private long processCpuPrevious = -1;
+    private long processWallPrevious = -1;
+    private volatile double latestProcessCpuUsage = -1;
+    private long processCpuUsageSamples;
+    private double processCpuUsageSum;
     private volatile Thread cpuSamplerThread;
 
     public CameraRuntime(Context context, File ffmpeg, String ffmpegAbi) {
@@ -320,7 +325,8 @@ public class CameraRuntime {
             JSONObject cpu = new JSONObject().put("process_id", android.os.Process.myPid())
                 .put("available_processors", rt.availableProcessors())
                 .put("system_usage_percent", latestCpuUsage < 0 ? JSONObject.NULL : Math.round(latestCpuUsage * 10.0) / 10.0)
-                .put("sample_age_ms", latestCpuSampleAt > 0 ? System.currentTimeMillis()-latestCpuSampleAt : JSONObject.NULL);
+                .put("sample_age_ms", latestCpuSampleAt > 0 ? System.currentTimeMillis()-latestCpuSampleAt : JSONObject.NULL)
+                .put("process_usage_percent", latestProcessCpuUsage < 0 ? JSONObject.NULL : Math.round(latestProcessCpuUsage * 10.0) / 10.0);
             return new JSONObject().put("running", running).put("port", port)
                 .put("uptime_seconds", (System.currentTimeMillis()-startedAt)/1000)
                 .put("memory", memory).put("cpu", cpu)
@@ -350,9 +356,27 @@ public class CameraRuntime {
         } catch (Exception e) { return -1; }
     }
 
+    private void sampleProcessCpu() {
+        long wallTime = android.os.SystemClock.elapsedRealtime();
+        long cpuTime = android.os.Process.getElapsedCpuTime();
+        if (processCpuPrevious >= 0 && processWallPrevious >= 0 && wallTime > processWallPrevious && cpuTime >= processCpuPrevious) {
+            double value = (cpuTime - processCpuPrevious) * 100.0 / (wallTime - processWallPrevious);
+            latestProcessCpuUsage = value;
+            synchronized (this) {
+                processCpuUsageSum += value;
+                processCpuUsageSamples++;
+            }
+        }
+        processCpuPrevious = cpuTime;
+        processWallPrevious = wallTime;
+    }
+
     private void startCpuSampler() {
+        processCpuPrevious = -1;
+        processWallPrevious = -1;
         Thread thread = new Thread(() -> {
             while (running && !Thread.currentThread().isInterrupted()) {
+                sampleProcessCpu();
                 double value = readSystemCpuPercent();
                 if (value >= 0) {
                     latestCpuUsage = value;
@@ -398,8 +422,14 @@ public class CameraRuntime {
             }
             double averageCpu;
             long cpuSamples;
-            synchronized (this) { cpuSamples = cpuUsageSamples; averageCpu = cpuSamples > 0 ? cpuUsageSum / cpuSamples : -1; }
+            double averageProcessCpu;
+            synchronized (this) {
+                cpuSamples = cpuUsageSamples;
+                averageCpu = cpuSamples > 0 ? cpuUsageSum / cpuSamples : -1;
+                averageProcessCpu = processCpuUsageSamples > 0 ? processCpuUsageSum / processCpuUsageSamples : -1;
+            }
             JSONObject cpu = new JSONObject().put("average_usage_percent", averageCpu >= 0 ? Math.round(averageCpu * 10.0) / 10.0 : JSONObject.NULL)
+                .put("average_process_usage_percent", averageProcessCpu >= 0 ? Math.round(averageProcessCpu * 10.0) / 10.0 : JSONObject.NULL)
                 .put("samples", cpuSamples);
             JSONObject totals = new JSONObject().put("jpeg_frames", totalFrames.get())
                 .put("ffmpeg_restarts", totalRestarts.get()).put("camera_errors", totalErrors.get());
