@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 public class CameraRuntime {
     private final Context context;
     private final File ffmpeg;
+    private final String ffmpegAbi;
     private final Map<String, CameraWorker> workers = new ConcurrentHashMap<String, CameraWorker>();
     private final Map<String, CameraCounters> cameraCounters = new ConcurrentHashMap<String, CameraCounters>();
     private final ArrayDeque<String> logBuffer = new ArrayDeque<String>();
@@ -44,9 +45,10 @@ public class CameraRuntime {
     private double cpuUsageSum;
     private volatile Thread cpuSamplerThread;
 
-    public CameraRuntime(Context context, File ffmpeg) {
+    public CameraRuntime(Context context, File ffmpeg, String ffmpegAbi) {
         this.context = context.getApplicationContext();
         this.ffmpeg = ffmpeg;
+        this.ffmpegAbi = ffmpegAbi;
     }
 
     public synchronized void start() throws Exception {
@@ -430,7 +432,7 @@ public class CameraRuntime {
 
     public JSONObject versionJson() {
         try { return new JSONObject().put("app", "fRTSP").put("version", BuildConfig.VERSION_NAME)
-            .put("ffmpeg", ffmpeg.exists() ? "bundled ARMv7" : "missing").put("ffmpeg_path", ffmpeg.getAbsolutePath()); }
+            .put("ffmpeg", ffmpeg.exists() ? ("bundled " + ("arm64-v8a".equals(ffmpegAbi) ? "ARM64" : "ARMv7")) : "missing").put("ffmpeg_path", ffmpeg.getAbsolutePath()); }
         catch (Exception e) { return new JSONObject(); }
     }
 
