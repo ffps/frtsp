@@ -17,6 +17,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,11 +46,16 @@ public class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(true);
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         int pad = dp(20);
         root.setPadding(pad, pad, pad, pad);
         root.setBackgroundColor(Color.WHITE);
+        scroll.addView(root, new ScrollView.LayoutParams(-1, -2));
 
         status = new TextView(this);
         status.setTextSize(14);
@@ -135,7 +141,7 @@ public class MainActivity extends Activity {
         saveButton = makeButton("Save", Color.rgb(55, 115, 190));
         LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(dp(104), dp(46));
         saveParams.topMargin = dp(10);
-        saveParams.gravity = Gravity.LEFT;
+        saveParams.gravity = Gravity.CENTER_HORIZONTAL;
         root.addView(saveButton, saveParams);
         saveButton.setOnClickListener(v -> saveSettings());
 
@@ -171,7 +177,7 @@ public class MainActivity extends Activity {
         root.addView(version, new LinearLayout.LayoutParams(-1, dp(28)));
 
         root.setFocusableInTouchMode(true);
-        setContentView(root);
+        setContentView(scroll);
         root.requestFocus();
         updateHint();
         updateStatus();
