@@ -798,6 +798,8 @@ header{
                 ['Время работы',formatDuration(s.uptime_seconds||current.uptime_seconds||0)],
                 ['Загрузка CPU сейчас',percent(cpu.system_usage_percent)],
                 ['Средняя загрузка CPU',percent((s.cpu||{}).average_usage_percent)],
+                ['Загрузка CPU процессом fRTSP сейчас',percent(cpu.process_usage_percent)],
+                ['Средняя загрузка CPU процессом fRTSP',percent((s.cpu||{}).average_process_usage_percent)],
                 ['Использование RAM (heap)',mb(mem.heap_used_mb)+' / '+mb(mem.heap_max_mb)],
                 ['Native heap',mb(mem.native_heap_mb)],
                 ['Свободная системная память',mb(mem.system_available_mb)+' / '+mb(mem.system_total_mb)],
