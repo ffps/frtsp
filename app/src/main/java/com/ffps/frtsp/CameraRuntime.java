@@ -358,7 +358,7 @@ public class CameraRuntime {
 
     private void sampleProcessCpu() {
         long wallTime = android.os.SystemClock.elapsedRealtime();
-        long cpuTime = android.os.Process.getElapsedCpuTime();
+        long cpuTime = readFfmpegGroupCpuTime();
         if (processCpuPrevious >= 0 && processWallPrevious >= 0 && wallTime > processWallPrevious && cpuTime >= processCpuPrevious) {
             double value = (cpuTime - processCpuPrevious) * 100.0 / (wallTime - processWallPrevious);
             latestProcessCpuUsage = value;
@@ -369,6 +369,47 @@ public class CameraRuntime {
         }
         processCpuPrevious = cpuTime;
         processWallPrevious = wallTime;
+    }
+
+    // Includes this app process and its direct FFmpeg children. /proc is available
+    // on the supported Android versions and avoids newer Process APIs.
+    private long readFfmpegGroupCpuTime() {
+        long cpuTime = android.os.Process.getElapsedCpuTime();
+        File proc = new File("/proc");
+        File[] entries = proc.listFiles();
+        if (entries == null) return cpuTime;
+        int ownPid = android.os.Process.myPid();
+        for (File entry : entries) {
+            if (!entry.isDirectory()) continue;
+            String name = entry.getName();
+            if (name.length() == 0) continue;
+            boolean numeric = true;
+            for (int i = 0; i < name.length(); i++) {
+                if (name.charAt(i) < '0' || name.charAt(i) > '9') {
+                    numeric = false;
+                    break;
+                }
+            }
+            if (!numeric) continue;
+            BufferedReader reader = null;
+            try {
+                reader = new BufferedReader(new FileReader(new File(entry, "stat")));
+                String line = reader.readLine();
+                if (line == null) continue;
+                int end = line.lastIndexOf(')');
+                if (end < 0 || end + 2 >= line.length()) continue;
+                String[] fields = line.substring(end + 2).trim().split("\\s+");
+                // Fields after comm: state, ppid, ... utime, stime.
+                if (fields.length <= 12 || Integer.parseInt(fields[1]) != ownPid) continue;
+                long ticks = Long.parseLong(fields[11]) + Long.parseLong(fields[12]);
+                // Android's Linux ABI uses 100 clock ticks per second.
+                cpuTime += ticks * 10L;
+            } catch (Exception ignored) {
+            } finally {
+                if (reader != null) try { reader.close(); } catch (Exception ignored) { }
+            }
+        }
+        return cpuTime;
     }
 
     private void startCpuSampler() {
