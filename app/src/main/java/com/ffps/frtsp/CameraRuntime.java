@@ -360,7 +360,10 @@ public class CameraRuntime {
         long wallTime = android.os.SystemClock.elapsedRealtime();
         long cpuTime = readFfmpegGroupCpuTime();
         if (processCpuPrevious >= 0 && processWallPrevious >= 0 && wallTime > processWallPrevious && cpuTime >= processCpuPrevious) {
-            double value = (cpuTime - processCpuPrevious) * 100.0 / (wallTime - processWallPrevious);
+            // Match the system CPU metric: /proc/stat reports utilization averaged
+            // across all online CPUs, while process CPU time is single-core equivalent.
+            double value = (cpuTime - processCpuPrevious) * 100.0
+                / ((wallTime - processWallPrevious) * Math.max(1, Runtime.getRuntime().availableProcessors()));
             latestProcessCpuUsage = value;
             synchronized (this) {
                 processCpuUsageSum += value;
