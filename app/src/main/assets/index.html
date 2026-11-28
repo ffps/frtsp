@@ -601,7 +601,7 @@ header{
             n.textContent=c.name;
             p.className='pill '+(s.state==='streaming'?'ok':(c.enabled?'bad':''));
             p.textContent=c.enabled?(s.state||'ожидание'):'выключена';
-            m.textContent=(s.source_width||0)+'×'+(s.source_height||0)+' · '+(s.output_fps||0)+' FPS · '+(s.frame_age_ms>=0?Math.round(s.frame_age_ms/1000)+' сек назад':'нет кадра');
+            m.textContent=s.frame_age_ms>=0?(s.source_width||0)+'×'+(s.source_height||0)+' · '+(s.output_fps||0)+' FPS'+(Math.round(s.frame_age_ms/1000)>=1?' · '+Math.round(s.frame_age_ms/1000)+' сек назад':''):'нет кадра';
             inf.onclick=function() { showCamera(c.name) };
             if(c.enabled) {
                 if(!img.getAttribute('src') || img._wasDisabled) {
