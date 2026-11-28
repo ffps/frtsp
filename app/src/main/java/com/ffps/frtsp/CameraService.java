@@ -1,7 +1,6 @@
 package com.ffps.frtsp;
 
 import android.app.Notification;
-import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
@@ -46,32 +45,22 @@ public class CameraService extends Service {
 
             Notification.Builder notificationBuilder;
             if (Build.VERSION.SDK_INT >= 26) {
-                NotificationManager notificationManager =
-                    (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-                if (notificationManager == null)
-                    throw new Exception("Notification manager is unavailable");
-
-                NotificationChannel channel = new NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "fRTSP service",
-                    NotificationManager.IMPORTANCE_LOW
-                );
-                channel.setDescription("Keeps the fRTSP camera server running");
-                notificationManager.createNotificationChannel(channel);
-                notificationBuilder = new Notification.Builder(this, NOTIFICATION_CHANNEL_ID);
+                notificationBuilder = Api26.createNotificationBuilder(this, NOTIFICATION_CHANNEL_ID);
             } else {
                 notificationBuilder = new Notification.Builder(this);
             }
 
-            Notification notification = notificationBuilder
+            notificationBuilder
                 .setContentTitle("fRTSP server is running")
                 .setContentText(serverUrl)
                 .setSmallIcon(R.drawable.ic_stat_frtsp)
                 .setContentIntent(pending)
                 .setOngoing(true)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .setPriority(Notification.PRIORITY_LOW)
-                .build();
+                .setPriority(Notification.PRIORITY_LOW);
+            if (Build.VERSION.SDK_INT >= 21) {
+                notificationBuilder.setCategory(Notification.CATEGORY_SERVICE);
+            }
+            Notification notification = notificationBuilder.build();
             startForeground(1, notification);
 
             runtime = new CameraRuntime(this, ffmpeg, ffmpegAbi);
@@ -86,6 +75,24 @@ public class CameraService extends Service {
             if (runtime != null) runtime.stop();
             runtime = null;
             stopSelf();
+        }
+    }
+
+    private static class Api26 {
+        static Notification.Builder createNotificationBuilder(Service service, String channelId) {
+            android.app.NotificationManager notificationManager =
+                (android.app.NotificationManager) service.getSystemService(NOTIFICATION_SERVICE);
+            if (notificationManager == null)
+                throw new IllegalStateException("Notification manager is unavailable");
+
+            android.app.NotificationChannel channel = new android.app.NotificationChannel(
+                channelId,
+                "fRTSP service",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            );
+            channel.setDescription("Keeps the fRTSP camera server running");
+            notificationManager.createNotificationChannel(channel);
+            return new Notification.Builder(service, channelId);
         }
     }
 
