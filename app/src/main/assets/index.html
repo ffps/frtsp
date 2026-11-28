@@ -446,7 +446,33 @@ header{
 </dialog>
 <script>
 (function() {
-    var token=sessionStorage.getItem('frtsp_auth')||'', cfg=null, st=null, editing=null;
+    var token='', cfg=null, st=null, editing=null;
+    var authKey='frtsp_auth', authExpiryKey='frtsp_auth_expiry';
+    var authLifetime=365*24*60*60*1000;
+    function saveAuth(value) {
+        token=value;
+        localStorage.setItem(authKey, token);
+        localStorage.setItem(authExpiryKey, String(Date.now()+authLifetime));
+        sessionStorage.removeItem(authKey);
+    }
+    function clearAuth() {
+        token='';
+        localStorage.removeItem(authKey);
+        localStorage.removeItem(authExpiryKey);
+        sessionStorage.removeItem(authKey);
+    }
+    try {
+        var savedToken=localStorage.getItem(authKey);
+        var savedExpiry=Number(localStorage.getItem(authExpiryKey)||0);
+        if(savedToken && savedExpiry>Date.now()) token=savedToken;
+        else if(savedToken) clearAuth();
+        if(!token) {
+            savedToken=sessionStorage.getItem(authKey);
+            if(savedToken) saveAuth(savedToken);
+        }
+    } catch(e) {
+        token=sessionStorage.getItem(authKey)||'';
+    }
     function $(id) {
         return document.getElementById(id)
     }
@@ -475,8 +501,7 @@ header{
             method:method||'GET', headers:h, body:data===undefined?undefined:JSON.stringify(data), cache:'no-store'
         }).then(function(r) {
             if(r.status===401) {
-                token='';
-                sessionStorage.removeItem('frtsp_auth');
+                clearAuth();
                 login();
                 throw Error('Требуется авторизация')
             }
@@ -512,7 +537,7 @@ header{
         e.preventDefault();
         token=btoa(unescape(encodeURIComponent('api:'+ $('password').value)));
         api('/api/v1/config').then(function(x) {
-            sessionStorage.setItem('frtsp_auth', token);
+            saveAuth(token);
             cfg=x;
             close('login');
             document.body.classList.remove('login-active');
@@ -781,7 +806,7 @@ header{
             close('settingsDlg');
             if(pw) {
                 token=btoa(unescape(encodeURIComponent('api:'+pw)));
-                sessionStorage.setItem('frtsp_auth', token)
+                saveAuth(token)
             }
             note('Настройки сохранены');
             setTimeout(refresh, 350)
@@ -826,8 +851,7 @@ header{
     }
     $('refresh').onclick=refresh;
     $('logout').onclick=function() {
-        token='';
-        sessionStorage.removeItem('frtsp_auth');
+        clearAuth();
         login()
     };
     if(token)api('/api/v1/config').then(function(x) {
